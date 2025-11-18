@@ -1,0 +1,44 @@
+services:
+  mongo0:
+    image: mongo:8.2
+    entrypoint: [/usr/bin/mongod, --bind_ip_all, --replSet, rs0]
+  mongo1:
+    image: mongo:8.2
+    entrypoint: [/usr/bin/mongod, --bind_ip_all, --replSet, rs0]
+  mongo2:
+    image: mongo:8.2
+    entrypoint: [/usr/bin/mongod, --bind_ip_all, --replSet, rs0]
+  init-mongo:
+    image: mongo:8.2
+    depends_on: [mongo0, mongo1, mongo2]
+    restart: 'no'
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        sleep 10
+        mongosh --host mongo0 <<EOF
+          rs.initiate(
+            {
+              _id: 'rs0',
+              version: 1,
+              members: [
+                { _id: 0, host: 'mongo0', priority: 2 },
+                { _id: 1, host: 'mongo1', priority: 0 },
+                { _id: 2, host: 'mongo2', priority: 0 },
+              ],
+            },
+            { force: true },
+          );
+        EOF
+  test:
+    build: { context: . }
+    depends_on: [init-mongo]
+    environment:
+      MONGO_URI: mongodb://mongo0,mongo1,mongo2/test?replicaSet=rs0
+    restart: 'no'
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        npm run lint
+        npm run pretty
+        npm run test

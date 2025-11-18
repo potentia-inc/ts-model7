@@ -1,0 +1,37 @@
+#!/bin/sh
+
+DIR=$(mktemp -d)
+DIST=$DIR/dist
+PACKAGE=$DIR/package
+RELEASE=$DIR/release
+URL=$(git config --get remote.origin.url)
+
+mkdir -p $DIST
+
+# build the package
+npm run clean && npm run dist &&
+  cp -r dist/src/* $DIST && \
+  cp -r LICENSE README.md CHANGELOG.md package.json package-lock.json $DIST && \
+  TGZ=`(cd $DIR && npm pack $DIST)`
+
+NAME=${TGZ%.tgz}
+VERSION=${NAME#potentia-model7-}
+
+# clone the repo
+git clone --branch npm $URL $RELEASE
+
+# unpack the package
+tar zxvf $DIR/$TGZ -C $DIR && mv $RELEASE/.git $PACKAGE
+
+TAG=$VERSION
+
+# update the repo
+(cd $PACKAGE && \
+  git add . && \
+  git commit -m "Release $VERSION" && \
+  git tag $TAG && \
+  git push && \
+  git push --tag)
+
+# cleanup
+rm -rf $DIR

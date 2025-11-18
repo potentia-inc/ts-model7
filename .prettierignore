@@ -1,0 +1,4 @@
+.drone.yml
+dist/
+README.md
+test.yml
