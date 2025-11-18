@@ -1,0 +1,1 @@
+{"version":3,"file":"upstream.js","sourceRoot":"","sources":["../../../src/error/upstream.ts"],"names":[],"mappings":"AAAA,MAAM,OAAO,aAAc,SAAQ,KAAK;IACtC,YAAY,OAAgB;QAC1B,KAAK,CAAC,OAAO,IAAI,wBAAwB,CAAC,CAAA;IAC5C,CAAC;CACF;AAED,MAAM,OAAO,eAAgB,SAAQ,aAAa;IAChD,YAAY,OAAgB;QAC1B,KAAK,CAAC,OAAO,IAAI,aAAa,CAAC,CAAA;IACjC,CAAC;CACF"}

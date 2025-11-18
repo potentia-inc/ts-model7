@@ -1,0 +1,53 @@
+{
+  "name": "@potentia/model7",
+  "version": "1.0.0",
+  "description": "model",
+  "main": "./index.js",
+  "scripts": {
+    "clean": "rimraf dist",
+    "dist": "tsc",
+    "fix": "npm run lint && npm run pretty",
+    "lint": "eslint --fix .",
+    "pretty": "prettier --write .",
+    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest"
+  },
+  "author": "Potentia Computing Inc.",
+  "license": "MIT",
+  "devDependencies": {
+    "@tsconfig/node24": "^24.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "eslint-plugin-jest": "^29.0.0",
+    "globals": "^16.0.0",
+    "jest": "^30.0.0",
+    "jest-extended": "^7.0.0",
+    "prettier": "^3.0.0",
+    "rimraf": "^6.0.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "peerDependencies": {
+    "@potentia/mongodb7": "github:potentia-inc/ts-mongodb7#semver:^1.0.0",
+    "@potentia/util": "github:potentia-inc/ts-util#semver:^3.5.0"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./model.js",
+    "./error": "./error.js",
+    "./error/lock": "./error/lock.js",
+    "./error/upstream": "./error/upstream.js",
+    "./lock": "./lock.js",
+    "./mongo": "./mongo.js",
+    "./type": "./type.js",
+    "./upstream": "./upstream.js",
+    "./upstream/pool": "./upstream-pool.js",
+    "./util": "./util.js"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
