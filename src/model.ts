@@ -4,8 +4,8 @@ import {
   Collection,
   CommandOperationOptions,
   Connection,
+  ExplainableCursor,
   Filter,
-  FindCursor,
   isDuplicationError,
   OptionalUnlessRequiredId,
   Sort,
@@ -97,7 +97,10 @@ export function pickIdOrNil<Id>(x?: ModelLike<Id> | Id | null): Id | Nil {
   return isNullish(x) ? Nil : pickId<Id>(x)
 }
 
-export type Options = CommandOperationOptions & { $now?: Date }
+export type Options = CommandOperationOptions & {
+  $now?: Date
+  $max?: number
+}
 
 export abstract class Models<
   D extends Doc<unknown>,
@@ -145,6 +148,21 @@ export abstract class Models<
   $sort(sort?: S): TypeOrNil<Sort> {
     return Nil
   }
+  $paginate(
+    pagination: Partial<Pagination<S>> = {},
+    options: { $max?: number } = {},
+  ) {
+    const { $max = Infinity } = options
+    const { offset = 0 } = pagination
+    const limit = Math.min(pagination.limit ?? $max, $max)
+    assert(offset >= 0 && Number.isInteger(offset))
+    assert(
+      limit >= 0 &&
+        ((Number.isInteger(limit) && limit <= $max) || limit === Infinity),
+    )
+    const sort = this.$sort(pagination.sort)
+    return { sort, offset, limit }
+  }
 
   async find(id: ModelOrId<M>, options: Options = {}): Promise<M> {
     const _id = pickId(id)
@@ -190,13 +208,15 @@ export abstract class Models<
     pagination: Partial<Pagination<S>> = {},
     options: Options = {},
   ): Cursor<D, M> {
+    const { sort, offset, limit } = this.$paginate(pagination, options)
     const cursor = this.collection.find(this.$query(query, options), options)
-    const { offset, limit } = pagination
-    const sort = this.$sort(pagination.sort)
     if (!isNullish(sort)) cursor.sort(sort)
-    if (!isNullish(offset)) cursor.skip(offset)
-    if (!isNullish(limit)) cursor.limit(limit)
-    return new Cursor<D, M>((x) => this.$model(x, options), cursor)
+    cursor.skip(offset)
+    if (limit !== Infinity) cursor.limit(limit)
+    return new Cursor<D, M>(
+      (x) => this.$model(x, options),
+      cursor as unknown as ExplainableCursor<D>, // make the typescript happy
+    )
   }
 
   async paginate(
@@ -204,21 +224,12 @@ export abstract class Models<
     pagination: Partial<Pagination<S>> = {},
     options: Options = {},
   ): Promise<[Pagination<S>, M[]]> {
-    const max = 1000
-    const { offset = 0 } = pagination
-    const limit = Math.min(pagination.limit ?? max, max)
-    assert(offset >= 0 && Number.isInteger(offset))
-    assert(limit >= 0 && limit <= max && Number.isInteger(limit))
-    const filter = this.$query(query)
-    const count = await this.collection.countDocuments(filter, options)
-    const cursor = this.collection.find(filter, options)
-    const sort = this.$sort(pagination.sort)
-    if (!isNullish(sort)) cursor.sort(sort)
-    const docs = await cursor.skip(offset).limit(limit).toArray()
-    return [
-      { sort: pagination.sort, offset, limit, count },
-      docs.map((x) => this.$model(x, options)),
-    ]
+    const { offset, limit } = this.$paginate(pagination, options)
+    const [count, docs] = await Promise.all([
+      this.count(query, options),
+      this.findMany(query, pagination, options),
+    ])
+    return [{ sort: pagination.sort, offset, limit, count }, docs]
   }
 
   async count(query: Q = {} as Q, options: Options = {}): Promise<number> {
@@ -323,13 +334,13 @@ export abstract class Models<
   }
 }
 
-export class Cursor<D extends Doc<unknown>, M extends Model<D>> {
+class Cursor<D extends Doc<unknown>, M extends Model<D>> {
   #model: (d: D | WithId<D>, options?: Options) => M
-  #cursor: FindCursor<WithId<D>>
+  #cursor: ExplainableCursor<D>
 
   constructor(
     model: (d: D | WithId<D>, options?: Options) => M,
-    cursor: FindCursor<WithId<D>>,
+    cursor: ExplainableCursor<D>,
   ) {
     this.#model = model
     this.#cursor = cursor
