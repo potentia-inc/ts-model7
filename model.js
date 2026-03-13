@@ -78,6 +78,16 @@ export class Models {
     $sort(sort) {
         return Nil;
     }
+    $paginate(pagination = {}, options = {}) {
+        const { $max = Infinity } = options;
+        const { offset = 0 } = pagination;
+        const limit = Math.min(pagination.limit ?? $max, $max);
+        assert(offset >= 0 && Number.isInteger(offset));
+        assert(limit >= 0 &&
+            ((Number.isInteger(limit) && limit <= $max) || limit === Infinity));
+        const sort = this.$sort(pagination.sort);
+        return { sort, offset, limit };
+    }
     async find(id, options = {}) {
         const _id = pickId(id);
         if (_id !== id)
@@ -102,34 +112,22 @@ export class Models {
         return map;
     }
     iterate(query = {}, pagination = {}, options = {}) {
+        const { sort, offset, limit } = this.$paginate(pagination, options);
         const cursor = this.collection.find(this.$query(query, options), options);
-        const { offset, limit } = pagination;
-        const sort = this.$sort(pagination.sort);
         if (!isNullish(sort))
             cursor.sort(sort);
-        if (!isNullish(offset))
-            cursor.skip(offset);
-        if (!isNullish(limit))
+        cursor.skip(offset);
+        if (limit !== Infinity)
             cursor.limit(limit);
         return new Cursor((x) => this.$model(x, options), cursor);
     }
     async paginate(query = {}, pagination = {}, options = {}) {
-        const max = 1000;
-        const { offset = 0 } = pagination;
-        const limit = Math.min(pagination.limit ?? max, max);
-        assert(offset >= 0 && Number.isInteger(offset));
-        assert(limit >= 0 && limit <= max && Number.isInteger(limit));
-        const filter = this.$query(query);
-        const count = await this.collection.countDocuments(filter, options);
-        const cursor = this.collection.find(filter, options);
-        const sort = this.$sort(pagination.sort);
-        if (!isNullish(sort))
-            cursor.sort(sort);
-        const docs = await cursor.skip(offset).limit(limit).toArray();
-        return [
-            { sort: pagination.sort, offset, limit, count },
-            docs.map((x) => this.$model(x, options)),
-        ];
+        const { offset, limit } = this.$paginate(pagination, options);
+        const [count, docs] = await Promise.all([
+            this.count(query, options),
+            this.findMany(query, pagination, options),
+        ]);
+        return [{ sort: pagination.sort, offset, limit, count }, docs];
     }
     async count(query = {}, options = {}) {
         return await this.collection.countDocuments(this.$query(query, options), options);

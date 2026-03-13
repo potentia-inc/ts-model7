@@ -1,4 +1,4 @@
-import { Collection, CommandOperationOptions, Connection, Filter, FindCursor, OptionalUnlessRequiredId, Sort, UpdateFilter, WithId } from './mongo.js';
+import { Collection, CommandOperationOptions, Connection, ExplainableCursor, Filter, OptionalUnlessRequiredId, Sort, UpdateFilter, WithId } from './mongo.js';
 import { ObjectId, Uuid, Nil, TypeOrNil } from './type.js';
 export { Filter, WithId, UpdateFilter, isDuplicationError } from './mongo.js';
 export type Timestamp = {
@@ -92,6 +92,7 @@ export declare function pickId<Id>(x: ModelLike<Id> | Id): Id;
 export declare function pickIdOrNil<Id>(x?: ModelLike<Id> | Id | null): Id | Nil;
 export type Options = CommandOperationOptions & {
     $now?: Date;
+    $max?: number;
 };
 export declare abstract class Models<D extends Doc<unknown>, M extends Model<D>, Q, I, U, S> {
     readonly connection: Connection;
@@ -107,6 +108,13 @@ export declare abstract class Models<D extends Doc<unknown>, M extends Model<D>,
     $set(values: U, options?: Options): UpdateFilter<D>;
     $unset(values: U, options?: Options): UpdateFilter<D>;
     $sort(sort?: S): TypeOrNil<Sort>;
+    $paginate(pagination?: Partial<Pagination<S>>, options?: {
+        $max?: number;
+    }): {
+        sort: TypeOrNil<Sort>;
+        offset: number;
+        limit: number;
+    };
     find(id: ModelOrId<M>, options?: Options): Promise<M>;
     findOne(query?: Q, options?: Options): Promise<TypeOrNil<M>>;
     findMany(query?: Q, pagination?: Partial<Pagination<S>>, options?: Options): Promise<M[]>;
@@ -123,7 +131,7 @@ export declare abstract class Models<D extends Doc<unknown>, M extends Model<D>,
 }
 export declare class Cursor<D extends Doc<unknown>, M extends Model<D>> {
     #private;
-    constructor(model: (d: D | WithId<D>, options?: Options) => M, cursor: FindCursor<WithId<D>>);
+    constructor(model: (d: D | WithId<D>, options?: Options) => M, cursor: ExplainableCursor<D>);
     [Symbol.asyncIterator](): AsyncGenerator<M, void, unknown>;
     toArray(options?: Options): Promise<M[]>;
 }
