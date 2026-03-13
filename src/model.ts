@@ -334,7 +334,7 @@ export abstract class Models<
   }
 }
 
-class Cursor<D extends Doc<unknown>, M extends Model<D>> {
+export class Cursor<D extends Doc<unknown>, M extends Model<D>> {
   #model: (d: D | WithId<D>, options?: Options) => M
   #cursor: ExplainableCursor<D>
 
