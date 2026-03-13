@@ -4,8 +4,8 @@ import {
   Collection,
   CommandOperationOptions,
   Connection,
+  ExplainableCursor,
   Filter,
-  FindCursor,
   isDuplicationError,
   OptionalUnlessRequiredId,
   Sort,
@@ -196,7 +196,10 @@ export abstract class Models<
     if (!isNullish(sort)) cursor.sort(sort)
     if (!isNullish(offset)) cursor.skip(offset)
     if (!isNullish(limit)) cursor.limit(limit)
-    return new Cursor<D, M>((x) => this.$model(x, options), cursor)
+    return new Cursor<D, M>(
+      (x) => this.$model(x, options),
+      cursor as unknown as ExplainableCursor<D>, // make the typescript happy
+    )
   }
 
   async paginate(
@@ -323,13 +326,13 @@ export abstract class Models<
   }
 }
 
-export class Cursor<D extends Doc<unknown>, M extends Model<D>> {
+class Cursor<D extends Doc<unknown>, M extends Model<D>> {
   #model: (d: D | WithId<D>, options?: Options) => M
-  #cursor: FindCursor<WithId<D>>
+  #cursor: ExplainableCursor<D>
 
   constructor(
     model: (d: D | WithId<D>, options?: Options) => M,
-    cursor: FindCursor<WithId<D>>,
+    cursor: ExplainableCursor<D>,
   ) {
     this.#model = model
     this.#cursor = cursor
