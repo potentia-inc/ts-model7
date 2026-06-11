@@ -23,12 +23,25 @@ export interface RateLimiter {
 // implement RateLimiter against a shared store -- see the MongoDB and Redis
 // recipes in the README.
 export class LocalRateLimiter implements RateLimiter {
-  #workers: number
+  #workers = 1
   #next: Map<string, number> = new Map()
 
   constructor(options: { workers?: number } = {}) {
-    this.#workers = options.workers ?? 1
-    assert(Number.isInteger(this.#workers) && this.#workers >= 1)
+    this.workers = options.workers ?? 1
+  }
+
+  // The number of pool instances sharing each upstream's budget. Adjust it as
+  // the fleet scales: the new value applies to subsequent reserve() calls, so
+  // the per-worker spacing (intervalMs * workers) tracks the current count. When
+  // scaling down, lower it only once the workers have actually stopped -- an
+  // over-count under-utilizes (safe), an under-count can breach the limit.
+  get workers(): number {
+    return this.#workers
+  }
+
+  set workers(workers: number) {
+    assert(Number.isInteger(workers) && workers >= 1)
+    this.#workers = workers
   }
 
   async reserve(key: string, intervalMs: number): Promise<void> {

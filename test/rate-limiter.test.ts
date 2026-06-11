@@ -39,6 +39,23 @@ describe('LocalRateLimiter', () => {
     expect(Date.now() - started).toBeGreaterThanOrEqual(2 * interval - 10)
   })
 
+  test('workers can be adjusted at runtime', async () => {
+    const limiter = new LocalRateLimiter()
+    expect(limiter.workers).toBe(1)
+
+    limiter.workers = 4
+    expect(limiter.workers).toBe(4)
+
+    const interval = 25
+    const started = Date.now()
+    await limiter.reserve('a', interval) // immediate
+    await limiter.reserve('a', interval) // waits interval * 4
+    expect(Date.now() - started).toBeGreaterThanOrEqual(4 * interval - 10)
+
+    expect(() => (limiter.workers = 0)).toThrow()
+    expect(() => (limiter.workers = 1.5)).toThrow()
+  })
+
   test('forget() clears the spacing state', async () => {
     const limiter = new LocalRateLimiter()
     await limiter.reserve('a', 1000) // pushes the next slot far ahead

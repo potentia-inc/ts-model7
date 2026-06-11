@@ -187,9 +187,19 @@ const pool = new UpstreamPool({
 })
 ```
 
+For a fleet that scales at runtime, adjust the divisor live — the new value
+applies to subsequent requests:
+
+```typescript
+const limiter = new LocalRateLimiter({ workers: 4 })
+// ... later, when the fleet scales:
+limiter.workers = 6
+```
+
 This is a ceiling, not a scheduler: under-counting `workers` breaks the global
 limit, while over-counting just under-utilizes it (an idle worker's share is
-wasted). For an autoscaling fleet where the worker count can't be bounded,
+wasted). When scaling down, lower `workers` only once the workers have actually
+stopped. For an autoscaling fleet where the worker count can't be bounded,
 implement `RateLimiter` against a shared store. Two recipes follow — copy and
 adapt them; they are intentionally not shipped, so you own the collection,
 failure policy and dependencies.
