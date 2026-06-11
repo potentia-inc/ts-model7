@@ -8,8 +8,8 @@ URL=$(git config --get remote.origin.url)
 
 mkdir -p $DIST
 
-# build the package
-npm run clean && npm run dist &&
+# build the package (release build omits source maps)
+npm run clean && npm run dist:release &&
   cp -r dist/src/* $DIST && \
   cp -r LICENSE README.md CHANGELOG.md package.json package-lock.json $DIST && \
   TGZ=`(cd $DIR && npm pack $DIST)`

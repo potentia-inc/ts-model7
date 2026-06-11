@@ -1,4 +1,4 @@
-.PHONY: test clean lint prettier dist
+.PHONY: test clean lint pretty fix dist
 
 IMAGE=node:24-slim
 USER=$(shell id -u):$(shell id -g)
@@ -7,8 +7,12 @@ VOLUME=$(PWD):$(WORKDIR)
 
 test:
 	docker compose build --pull
-	docker compose run test || true
-	docker compose down --remove-orphans
+	docker compose run --rm node && \
+	docker compose run --rm bun && \
+	docker compose run --rm deno; \
+	status=$$?; \
+	docker compose down --remove-orphans; \
+	exit $$status
 
 clean:
 	docker run --rm -u $(USER) -w $(WORKDIR) -v $(VOLUME) $(IMAGE) npm run clean
@@ -16,8 +20,8 @@ clean:
 lint:
 	docker run --rm -u $(USER) -w $(WORKDIR) -v $(VOLUME) $(IMAGE) npm run lint
 
-prettier:
-	docker run --rm -u $(USER) -w $(WORKDIR) -v $(VOLUME) $(IMAGE) npm run prettier
+pretty:
+	docker run --rm -u $(USER) -w $(WORKDIR) -v $(VOLUME) $(IMAGE) npm run pretty
 
 fix:
 	docker run --rm -u $(USER) -w $(WORKDIR) -v $(VOLUME) $(IMAGE) npm run fix

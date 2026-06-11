@@ -211,7 +211,9 @@ describe('upstream-pool', () => {
     pool.fail(upstream) // failure: 4, weight: 0.25 -> 0.125
     pool.fail(upstream) // failure: 5, weight: 0.125 -> 0.0625
 
-    const total = 100
+    // a large sample keeps the statistical assertions below well clear of
+    // their bounds (~4σ), so they don't flake across the node/deno runs
+    const total = 500
     let hit = 0
     for (let i = 0; i < total; ++i) {
       const x = await pool.sample(type)

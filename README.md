@@ -4,6 +4,21 @@ Model utility based on
 [@potentia/util](https://github.com/potentia-inc/ts-util) and
 [@potentia/mongodb7](https://github.com/potentia-inc/ts-mongodb7)
 
+## Runtime support
+
+Works on **Node.js (>= 22)**, **Bun** and **Deno (>= 2)**. The published package
+ships compiled JavaScript plus type declarations and depends only on
+[@potentia/util](https://github.com/potentia-inc/ts-util),
+[@potentia/mongodb7](https://github.com/potentia-inc/ts-mongodb7) and the
+`mongodb` driver (all peer dependencies), each of which runs on the three
+runtimes. A framework-free `smoke.mjs` exercises a live-MongoDB round trip on
+Node, Bun and Deno; the `node:test` suites run on Node and Deno (Bun cannot run
+`node:test` yet — [oven-sh/bun#5090](https://github.com/oven-sh/bun/issues/5090)).
+
+```sh
+npm install @potentia/model7 mongodb   # or: bun add / deno add
+```
+
 ## Model
 
 Refer to the tests for additional details.

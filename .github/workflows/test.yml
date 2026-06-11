@@ -1,0 +1,66 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+env:
+  MONGO_URI: mongodb://localhost:27017/test?replicaSet=rs0
+
+jobs:
+  node:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: supercharge/mongodb-github-action@1.12.0
+        with:
+          mongodb-version: '8.0'
+          mongodb-replica-set: rs0
+      - run: npm ci
+      - run: npm run dist
+      - run: npm run test:node
+      - run: npm run smoke
+
+  bun:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: oven-sh/setup-bun@v2
+      - uses: supercharge/mongodb-github-action@1.12.0
+        with:
+          mongodb-version: '8.0'
+          mongodb-replica-set: rs0
+      - run: npm ci
+      - run: npm run dist
+      # Bun cannot run the node:test suite (oven-sh/bun#5090), so verify the
+      # package on bun with the framework-free DB smoke.
+      - run: npm run smoke:bun
+
+  deno:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: supercharge/mongodb-github-action@1.12.0
+        with:
+          mongodb-version: '8.0'
+          mongodb-replica-set: rs0
+      - run: npm ci
+      - run: npm run dist
+      # Deno runs the node:test suite (incl. the DB tests) plus the DB smoke.
+      - run: npm run test:deno
+      - run: npm run smoke:deno

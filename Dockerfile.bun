@@ -1,0 +1,15 @@
+# Build the package with the canonical toolchain (node + tsc) ...
+FROM node:24-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm clean-install
+COPY . .
+RUN npm run dist
+
+# ... then run the framework-free smoke (built artifact) on bun. The whole tree
+# — including node_modules (mongodb, @potentia/*) — is carried over so the dist
+# artifact can resolve its runtime imports. (Bun cannot run the node:test suite,
+# oven-sh/bun#5090, so the smoke is the bun coverage.)
+FROM oven/bun:1
+WORKDIR /app
+COPY --from=build /app /app
