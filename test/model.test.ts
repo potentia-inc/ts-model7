@@ -163,17 +163,17 @@ describe('model', () => {
     ])
 
     // updateOne, updateMany
-    await expect(() => FOOS.updateOne(toUuid(), { bar: 123 })).rejects.toThrow(
-      NotFoundError,
-    )
-    expect(await FOOS.updateOne(test, { bar: 123 })).toMatchObject({
+    await expect(() =>
+      FOOS.updateOne({ id: toUuid() }, { bar: 123 }),
+    ).rejects.toThrow(NotFoundError)
+    expect(await FOOS.updateOne({ id: test }, { bar: 123 })).toMatchObject({
       id: test.id,
       foo: test.foo,
       bar: 123,
       createdAt: expect.toEqualDate(test.createdAt),
       updatedAt: expect.toBeDate(),
     })
-    expect(await FOOS.updateOne(test, { bar: Nil })).toMatchObject({
+    expect(await FOOS.updateOne({ id: test }, { bar: Nil })).toMatchObject({
       id: test.id,
       foo: test.foo,
       bar: Nil,
@@ -184,10 +184,14 @@ describe('model', () => {
     expect(await FOOS.updateMany({ foo: randStr() }, { bar: 789 })).toBe(0)
 
     // deleteOne, deleteMany
-    await expect(() => FOOS.deleteOne(toUuid())).rejects.toThrow(NotFoundError)
-    await FOOS.deleteOne(test)
+    await expect(() => FOOS.deleteOne({ id: toUuid() })).rejects.toThrow(
+      NotFoundError,
+    )
+    await FOOS.deleteOne({ id: test })
     expect(await FOOS.findOne({ id: test })).toBeNil()
-    await expect(() => FOOS.deleteOne(test)).rejects.toThrow(NotFoundError)
+    await expect(() => FOOS.deleteOne({ id: test })).rejects.toThrow(
+      NotFoundError,
+    )
     expect(await FOOS.deleteMany({})).toBe(1)
     expect(await FOOS.deleteMany({})).toBe(0)
   })
@@ -385,20 +389,19 @@ describe('model', () => {
     await expect(() =>
       BARS.updateOne(
         {
-          foo: toUuid(),
-          bar: randStr(),
+          id: { foo: toUuid(), bar: randStr() },
         },
         { bar: 123 },
       ),
     ).rejects.toThrow(NotFoundError)
-    expect(await BARS.updateOne(test, { bar: 123 })).toMatchObject({
+    expect(await BARS.updateOne({ id: test }, { bar: 123 })).toMatchObject({
       id: test.id,
       foo: test.foo,
       bar: 123,
       createdAt: expect.toEqualDate(test.createdAt),
       updatedAt: expect.toBeDate(),
     })
-    expect(await BARS.updateOne(test, { bar: Nil })).toMatchObject({
+    expect(await BARS.updateOne({ id: test }, { bar: Nil })).toMatchObject({
       id: test.id,
       foo: test.foo,
       bar: Nil,
@@ -411,13 +414,14 @@ describe('model', () => {
     // deleteOne, deleteMany
     await expect(() =>
       BARS.deleteOne({
-        foo: toUuid(),
-        bar: randStr(),
+        id: { foo: toUuid(), bar: randStr() },
       }),
     ).rejects.toThrow(NotFoundError)
-    await BARS.deleteOne(test)
+    await BARS.deleteOne({ id: test })
     expect(await BARS.findOne({ id: test })).toBeNil()
-    await expect(() => BARS.deleteOne(test)).rejects.toThrow(NotFoundError)
+    await expect(() => BARS.deleteOne({ id: test })).rejects.toThrow(
+      NotFoundError,
+    )
     expect(await BARS.deleteMany({})).toBe(1)
     expect(await BARS.deleteMany({})).toBe(0)
   })

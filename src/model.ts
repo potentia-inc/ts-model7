@@ -297,14 +297,10 @@ export abstract class Models<
     throw new UnacknowledgedError()
   }
 
-  async updateOne(
-    id: ModelOrId<M>,
-    values: U,
-    options: Options = {},
-  ): Promise<M> {
+  async updateOne(query: Q, values: U, options: Options = {}): Promise<M> {
     const $options = { ...options, $now: options.$now ?? new Date() }
     const updated = await this.collection.findOneAndUpdate(
-      { _id: pickId(id) } as Filter<D>,
+      this.$query(query, $options),
       {
         $inc: this.$inc(values, $options),
         $set: { updated_at: $options.$now, ...this.$set(values, $options) },
@@ -334,9 +330,9 @@ export abstract class Models<
     return modifiedCount
   }
 
-  async deleteOne(id: ModelOrId<M>, options: Options = {}): Promise<void> {
+  async deleteOne(query: Q, options: Options = {}): Promise<void> {
     const { deletedCount } = await this.collection.deleteOne(
-      { _id: pickId(id) } as Filter<D>,
+      this.$query(query, options),
       toMongoOptions(options),
     )
     if (deletedCount !== 1) throw new NotFoundError(`Not Found: ${this.name}`)

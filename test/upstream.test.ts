@@ -65,15 +65,18 @@ describe('upstream', () => {
     ).toMatchObject([upstream])
 
     // update
-    const updated = await UPSTREAMS.updateOne(upstream, {
-      host: `${randHost()}/${randPath()}/`,
-      path: randPath(),
-      headers: Nil,
-      searchs: Nil,
-      auth: Nil,
-      interval: 1.5,
-      weight: Nil,
-    })
+    const updated = await UPSTREAMS.updateOne(
+      { id: upstream },
+      {
+        host: `${randHost()}/${randPath()}/`,
+        path: randPath(),
+        headers: Nil,
+        searchs: Nil,
+        auth: Nil,
+        interval: 1.5,
+        weight: Nil,
+      },
+    )
 
     expect(updated.url().toString()).toBe(`${updated.host}${updated.path}`)
     expect(updated.link()).toBe(`${updated.host}${updated.path}`)

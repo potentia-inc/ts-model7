@@ -196,7 +196,7 @@ export class Locks extends Models<
       if (!isNullish(state.lock)) {
         const lock = state.lock
         state.lock = Nil
-        await this.deleteOne(lock).catch((err) => {
+        await this.deleteOne({ id: lock }).catch((err) => {
           options.onError?.(new UnlockError(getMessage(err)))
         })
       }

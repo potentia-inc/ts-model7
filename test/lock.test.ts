@@ -86,7 +86,10 @@ describe('lock', () => {
   test('RelockError', async () => {
     const id = randStr()
     const timeout = new Promise((resolve, reject) =>
-      setTimeout(() => LOCKS.deleteOne(id).then(resolve).catch(reject), 2000),
+      setTimeout(
+        () => LOCKS.deleteOne({ id }).then(resolve).catch(reject),
+        2000,
+      ),
     )
     let called = 0
     const onError = (err: unknown) => {
@@ -113,7 +116,10 @@ describe('lock', () => {
   test('UnlockError', async () => {
     const id = randStr()
     const timeout = new Promise((resolve, reject) =>
-      setTimeout(() => LOCKS.deleteOne(id).then(resolve).catch(reject), 3500),
+      setTimeout(
+        () => LOCKS.deleteOne({ id }).then(resolve).catch(reject),
+        3500,
+      ),
     )
     let called = 0
     const onError = (err: unknown) => {

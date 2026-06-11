@@ -59,7 +59,7 @@ await locks.lock(
 const lock = await Locks.trylock({ id: 'foobar', expiresAt: ... })
 if (lock !== undefined) {
   await locks.relock(lock, { expiresAt: ... }) // extend the lock
-  await locks.deleteOne(lock) // release the lock
+  await locks.deleteOne({ id: lock }) // release the lock
 }
 ```
 
