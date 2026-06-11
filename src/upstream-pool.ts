@@ -2,9 +2,9 @@ import assert from 'node:assert'
 import { debug } from 'node:util'
 import { NoUpstreamError } from './error/upstream.js'
 import { pickId, pickIdOrNil } from './model.js'
+import { LocalRateLimiter, RateLimiter } from './upstream-rate-limiter.js'
 import { isNullish } from './type.js'
 import { Upstream, UpstreamOrId } from './upstream.js'
-import { msleep } from './util.js'
 
 const DEBUG = debug('potentia:model:upstream')
 const DEBUG_VERBOSE = debug('potentia:model:upstream:verbose')
@@ -19,6 +19,10 @@ export type UpstreamPoolInit = {
 export type UpstreamPoolOptions = {
   load: (type: Upstream['type']) => Promise<Upstream[]>
   init?: (type: Upstream['type']) => Partial<UpstreamPoolInit>
+  // Strategy that enforces each upstream's `interval`. Defaults to an in-process
+  // LocalRateLimiter; supply your own (e.g. a shared-store limiter) for global,
+  // cross-worker coordination.
+  rateLimiter?: RateLimiter
 }
 
 type Hint = {
@@ -28,10 +32,12 @@ type Hint = {
 
 export class UpstreamPool {
   #options: UpstreamPoolOptions
+  #limiter: RateLimiter
   #pools = new Map<string, Pool>()
 
   constructor(options: UpstreamPoolOptions) {
     this.#options = options
+    this.#limiter = options.rateLimiter ?? new LocalRateLimiter()
   }
 
   async sample(type: Upstream['type'], hint?: Hint) {
@@ -53,6 +59,7 @@ export class UpstreamPool {
 
     const created = new Pool({
       load: () => this.#options.load(type),
+      limiter: this.#limiter,
       ...this.#options.init?.(type),
     })
     this.#pools.set(type, created)
@@ -63,19 +70,21 @@ export class UpstreamPool {
 class Pool {
   #options: UpstreamPoolInit
   #load: () => Promise<Upstream[]>
+  #limiter: RateLimiter
 
   #caches: Upstream[] = []
   #failures: Map<string, number> = new Map()
-  #times: Map<string, number> = new Map()
   #weights: Map<string, number> = new Map()
   #expiresAt: number = 0
 
   constructor(
     options: Partial<UpstreamPoolInit> & {
       load: () => Promise<Upstream[]>
+      limiter: RateLimiter
     },
   ) {
     this.#load = options.load
+    this.#limiter = options.limiter
     this.#options = {
       ttl: options.ttl ?? 60,
       minFailures: options.minFailures ?? 0,
@@ -118,11 +127,9 @@ class Pool {
       throw new NoUpstreamError() // should not reach here!
     })()
 
-    // wait a while if necessary
+    // enforce the per-upstream rate limit
     const key = this.#key(upstream)
-    const duration = this.#time(key) + upstream.interval * 1000 - Date.now()
-    if (duration > 0) await msleep(duration)
-    this.#times.set(key, Date.now())
+    await this.#limiter.reserve(key, upstream.interval * 1000)
     DEBUG(`sample: ${candidates.length} ${key}`)
     return upstream
   }
@@ -171,7 +178,7 @@ class Pool {
     for (const x of this.#caches) {
       const key = this.#key(x)
       if (!keys.has(key)) {
-        this.#times.delete(key)
+        this.#limiter.forget?.(key)
         this.#failures.delete(key)
         this.#weights.delete(key)
       }
@@ -186,7 +193,6 @@ class Pool {
           return {
             key,
             failure: this.#failure(key),
-            time: this.#time(key),
             weight: this.#weight(key, x.weight),
           }
         }),
@@ -200,10 +206,6 @@ class Pool {
 
   #failure(key: string): number {
     return this.#failures.get(key) ?? 0
-  }
-
-  #time(key: string): number {
-    return this.#times.get(key) ?? 0
   }
 
   #weight(key: string, weight: number): number {

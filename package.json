@@ -46,6 +46,7 @@
     "./type": "./type.js",
     "./upstream": "./upstream.js",
     "./upstream/pool": "./upstream-pool.js",
+    "./upstream/rate-limiter": "./upstream-rate-limiter.js",
     "./util": "./util.js"
   },
   "engines": {
