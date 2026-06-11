@@ -12,7 +12,7 @@ import {
   toRangeOrNil,
 } from '../src/model.js'
 import { Connection } from '../src/mongo.js'
-import { Nil, isNullish, toUuid } from '../src/type.js'
+import { Nil, Uuid, isNullish } from '../src/type.js'
 import { FOO_SCHEMA, Foos } from './foo.js'
 import { BAR_SCHEMA, Bars } from './bar.js'
 import { date, match, string, uuid } from './assert.js'
@@ -63,7 +63,7 @@ describe('model', () => {
       foo: test.foo,
       createdAt: date(test.createdAt),
     })
-    await assert.rejects(FOOS.find(toUuid()), NotFoundError)
+    await assert.rejects(FOOS.find(new Uuid()), NotFoundError)
     match(await FOOS.findOne({ id: test }), {
       id: test.id,
       foo: test.foo,
@@ -128,7 +128,7 @@ describe('model', () => {
 
     // updateOne, updateMany
     await assert.rejects(
-      FOOS.updateOne({ id: toUuid() }, { bar: 123 }),
+      FOOS.updateOne({ id: new Uuid() }, { bar: 123 }),
       NotFoundError,
     )
     match(await FOOS.updateOne({ id: test }, { bar: 123 }), {
@@ -149,7 +149,7 @@ describe('model', () => {
     assert.equal(await FOOS.updateMany({ foo: randStr() }, { bar: 789 }), 0)
 
     // deleteOne, deleteMany
-    await assert.rejects(FOOS.deleteOne({ id: toUuid() }), NotFoundError)
+    await assert.rejects(FOOS.deleteOne({ id: new Uuid() }), NotFoundError)
     await FOOS.deleteOne({ id: test })
     assert.equal(await FOOS.findOne({ id: test }), Nil)
     await assert.rejects(FOOS.deleteOne({ id: test }), NotFoundError)
@@ -164,7 +164,7 @@ describe('model', () => {
 
     // insertOne and insertMany
     const test = await BARS.insertOne({
-      id: { foo: toUuid(), bar: randStr() },
+      id: { foo: new Uuid(), bar: randStr() },
       foo,
     })
     match(test, {
@@ -177,17 +177,17 @@ describe('model', () => {
       ConflictError,
     )
     await assert.rejects(
-      BARS.insertOne({ id: { foo: toUuid(), bar: randStr() }, foo }),
+      BARS.insertOne({ id: { foo: new Uuid(), bar: randStr() }, foo }),
       ConflictError,
     )
     match(
       await BARS.insertMany([
-        { id: { foo: toUuid(), bar: randStr() }, foo: foo2 },
+        { id: { foo: new Uuid(), bar: randStr() }, foo: foo2 },
       ]),
       [{ id: { foo: uuid(), bar: string }, foo: foo2, createdAt: date() }],
     )
     await assert.rejects(
-      BARS.insertMany([{ id: { foo: toUuid(), bar: randStr() }, foo: foo2 }]),
+      BARS.insertMany([{ id: { foo: new Uuid(), bar: randStr() }, foo: foo2 }]),
       ConflictError,
     )
 
@@ -203,7 +203,7 @@ describe('model', () => {
       createdAt: date(test.createdAt),
     })
     await assert.rejects(
-      BARS.find({ foo: toUuid(), bar: randStr() }),
+      BARS.find({ foo: new Uuid(), bar: randStr() }),
       NotFoundError,
     )
     match(await BARS.findOne({ id: test }), {
@@ -293,7 +293,7 @@ describe('model', () => {
 
     // updateOne, updateMany
     await assert.rejects(
-      BARS.updateOne({ id: { foo: toUuid(), bar: randStr() } }, { bar: 123 }),
+      BARS.updateOne({ id: { foo: new Uuid(), bar: randStr() } }, { bar: 123 }),
       NotFoundError,
     )
     match(await BARS.updateOne({ id: test }, { bar: 123 }), {
@@ -315,7 +315,7 @@ describe('model', () => {
 
     // deleteOne, deleteMany
     await assert.rejects(
-      BARS.deleteOne({ id: { foo: toUuid(), bar: randStr() } }),
+      BARS.deleteOne({ id: { foo: new Uuid(), bar: randStr() } }),
       NotFoundError,
     )
     await BARS.deleteOne({ id: test })

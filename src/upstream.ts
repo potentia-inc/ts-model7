@@ -11,7 +11,7 @@ import {
   pickIdOrNil,
   toUnsetOrNil,
 } from './model.js'
-import { Nil, TypeOrNil, toUuid, isNullish } from './type.js'
+import { Nil, TypeOrNil, Uuid, isNullish } from './type.js'
 import { option } from './util.js'
 
 export const UPSTREAM_NAME = 'upstreams'
@@ -181,7 +181,7 @@ export class Upstreams extends Models<
       values
     assertInterval(interval)
     assertWeight(weight)
-    const _id = values.id ?? toUuid()
+    const _id = values.id ?? new Uuid()
     return { _id, type, host, path, headers, searchs, auth, interval, weight }
   }
 

@@ -28,8 +28,9 @@
     "typescript-eslint": "^8.0.0"
   },
   "peerDependencies": {
-    "@potentia/mongodb7": "github:potentia-inc/ts-mongodb7#semver:^1.0.0",
-    "@potentia/util": "github:potentia-inc/ts-util#semver:^3.5.0"
+    "@potentia/mongodb7": "github:potentia-inc/ts-mongodb7#semver:^2.0.0",
+    "@potentia/util": "github:potentia-inc/ts-util#semver:^4.2.0",
+    "mongodb": "^7.0.0"
   },
   "type": "module",
   "exports": {

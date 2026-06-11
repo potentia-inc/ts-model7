@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { after, before, describe, test } from 'node:test'
 import { NoUpstreamError } from '../src/error/upstream.js'
 import { Connection } from '../src/mongo.js'
-import { Nil, isNullish, toUuid } from '../src/type.js'
+import { Nil, Uuid, isNullish } from '../src/type.js'
 import {
   UPSTREAM_SCHEMA,
   UpstreamInsert,
@@ -155,7 +155,7 @@ describe('upstream-pool', () => {
 
     const type = randStr()
     await insertUpstreams({ type, host: randStr(), weight: 1 })
-    const id = toUuid()
+    const id = new Uuid()
     for (let i = 0; i < 20; ++i) {
       const upstream = await pool.sample(type, { type: 'same', upstream: id })
       assert.ok(!upstream.id.equals(id))
