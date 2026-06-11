@@ -3,6 +3,9 @@ import { randomBytes } from 'node:crypto'
 import { after, before, describe, test } from 'node:test'
 import { ConflictError, NotFoundError } from '../src/error.js'
 import {
+  Model,
+  Models,
+  StringDoc,
   getSortKey,
   toExistsOrNil,
   toUnsetOrNil,
@@ -393,6 +396,51 @@ describe('model', () => {
     })
     match(toRangeOrNil({ end }), { $lt: date(end) })
     match(toRangeOrNil({ end }, true), { $lte: date(end) })
+  })
+
+  test('base Models defaults', async () => {
+    // a model that overrides only the required hooks, exercising the base
+    // $query / $set / $unset / $sort defaults ({} / {} / {} / Nil)
+    class Baz extends Model<StringDoc> {}
+    class Bazs extends Models<
+      StringDoc,
+      Baz,
+      object,
+      { id: string },
+      object,
+      object
+    > {
+      get name(): string {
+        return 'bazs'
+      }
+      $model(doc: StringDoc): Baz {
+        return new Baz(doc)
+      }
+      $insert(values: { id: string }) {
+        return { _id: values.id }
+      }
+    }
+
+    await CONNECTION.migrate({ name: 'bazs' })
+    const BAZS = new Bazs({ connection: CONNECTION })
+    await BAZS.deleteMany({})
+
+    const baz = await BAZS.insertOne({ id: randStr() })
+    // base $query returns {} -> matches everything
+    match(await BAZS.findOne({}), {
+      id: baz.id,
+      createdAt: date(baz.createdAt),
+    })
+    // base $sort returns Nil
+    assert.equal((await BAZS.findMany({}, { sort: {} })).length, 1)
+    // base $inc/$set/$unset return {} -> the update only bumps updated_at
+    match(await BAZS.updateOne({}, {}), {
+      id: baz.id,
+      createdAt: date(baz.createdAt),
+      updatedAt: date(),
+    })
+
+    await BAZS.deleteMany({})
   })
 })
 
