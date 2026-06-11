@@ -1,3 +1,5 @@
+import { strict as assert } from 'node:assert'
+import { describe, test } from 'node:test'
 import { LocalRateLimiter } from '../src/upstream-rate-limiter.js'
 
 describe('LocalRateLimiter', () => {
@@ -7,7 +9,7 @@ describe('LocalRateLimiter', () => {
     const started = Date.now()
     for (let i = 0; i < 4; ++i) await limiter.reserve('a', interval)
     // first is immediate, the next three each wait one interval
-    expect(Date.now() - started).toBeGreaterThanOrEqual(3 * interval - 10)
+    assert.ok(Date.now() - started >= 3 * interval - 10)
   })
 
   test('keys are independent', async () => {
@@ -15,7 +17,7 @@ describe('LocalRateLimiter', () => {
     const started = Date.now()
     await limiter.reserve('a', 1000)
     await limiter.reserve('b', 1000) // different key: no wait
-    expect(Date.now() - started).toBeLessThan(100)
+    assert.ok(Date.now() - started < 100)
   })
 
   test('workers multiplies the spacing', async () => {
@@ -24,7 +26,7 @@ describe('LocalRateLimiter', () => {
     const started = Date.now()
     await limiter.reserve('a', interval) // immediate
     await limiter.reserve('a', interval) // waits interval * workers
-    expect(Date.now() - started).toBeGreaterThanOrEqual(3 * interval - 10)
+    assert.ok(Date.now() - started >= 3 * interval - 10)
   })
 
   test('concurrent reserves queue (slot reserved before awaiting)', async () => {
@@ -36,24 +38,24 @@ describe('LocalRateLimiter', () => {
       limiter.reserve('a', interval),
       limiter.reserve('a', interval),
     ])
-    expect(Date.now() - started).toBeGreaterThanOrEqual(2 * interval - 10)
+    assert.ok(Date.now() - started >= 2 * interval - 10)
   })
 
   test('workers can be adjusted at runtime', async () => {
     const limiter = new LocalRateLimiter()
-    expect(limiter.workers).toBe(1)
+    assert.equal(limiter.workers, 1)
 
     limiter.workers = 4
-    expect(limiter.workers).toBe(4)
+    assert.equal(limiter.workers, 4)
 
     const interval = 25
     const started = Date.now()
     await limiter.reserve('a', interval) // immediate
     await limiter.reserve('a', interval) // waits interval * 4
-    expect(Date.now() - started).toBeGreaterThanOrEqual(4 * interval - 10)
+    assert.ok(Date.now() - started >= 4 * interval - 10)
 
-    expect(() => (limiter.workers = 0)).toThrow()
-    expect(() => (limiter.workers = 1.5)).toThrow()
+    assert.throws(() => (limiter.workers = 0))
+    assert.throws(() => (limiter.workers = 1.5))
   })
 
   test('forget() clears the spacing state', async () => {
@@ -62,6 +64,6 @@ describe('LocalRateLimiter', () => {
     limiter.forget('a')
     const started = Date.now()
     await limiter.reserve('a', 1000) // immediate again
-    expect(Date.now() - started).toBeLessThan(100)
+    assert.ok(Date.now() - started < 100)
   })
 })
