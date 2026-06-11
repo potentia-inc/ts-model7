@@ -80,7 +80,7 @@ const upstream = await upstreams.insertOne({
   headers: { ... },
   searchs: { a: 'foo', b: 'bar' },
 
-  // The minimum interval (in seconds) between consecutive requests. Default: 0.01.
+  // The minimum interval (in seconds) between consecutive requests. Default: 0.001.
   interval: 0.2,
 
   // The weight of this upstream. Set to a positive number to enable it. Default: 0.

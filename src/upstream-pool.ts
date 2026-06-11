@@ -145,7 +145,10 @@ class Pool {
     const failure = this.#failure(key) + 1
     this.#failures.set(key, failure)
     if (failure >= this.#options.minFailures) {
-      const weight = this.#weight(key, upstream.weight) * this.#options.decay
+      const weight = Math.max(
+        this.#options.minWeight,
+        this.#weight(key, upstream.weight) * this.#options.decay,
+      )
       DEBUG(`fail:${key}: ${failure} ${weight}`)
       this.#weights.set(key, weight)
     } else {
@@ -170,6 +173,7 @@ class Pool {
       if (!keys.has(key)) {
         this.#times.delete(key)
         this.#failures.delete(key)
+        this.#weights.delete(key)
       }
     }
     this.#caches.splice(0, this.#caches.length, ...upstreams)

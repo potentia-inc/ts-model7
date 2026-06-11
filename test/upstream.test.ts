@@ -4,7 +4,6 @@ import { NoUpstreamError } from '../src/error/upstream.js'
 import { Connection } from '../src/mongo.js'
 import { Nil, isNullish, toUuid } from '../src/type.js'
 import {
-  Pool, // deprecated
   UPSTREAM_SCHEMA,
   UpstreamInsert,
   UpstreamQuery,
@@ -219,111 +218,6 @@ describe('upstream-pool', () => {
     hit = 0
     for (let i = 0; i < total; ++i) {
       const x = await pool.sample(type)
-      if (x.id.equals(upstream.id)) ++hit
-    }
-    rate = hit / total
-    expect(rate >= 0.4 && rate <= 0.6).toBeTruthy() // hit rate ~ 50%
-  })
-})
-
-describe('pool (deprecated)', () => {
-  test('sync', async () => {
-    const type = randStr()
-    const pool = new Pool(UPSTREAMS, type, { ttl: 3 })
-    await insertUpstreams({ type, host: randStr(), weight: 1 })
-    expect(await pool.sample()).not.toBeUndefined()
-    await deleteUpstreams({ type })
-    expect(await pool.sample()).not.toBeUndefined() // not sync yet
-    await sleep(4000)
-    await expect(() => pool.sample()).rejects.toThrow(NoUpstreamError)
-  })
-
-  test('NoUpstreamError', async () => {
-    const type = randStr()
-    const pool = new Pool(UPSTREAMS, type, { ttl: 3 })
-    await insertUpstreams({ type, host: randStr() }) // no weight
-    await expect(() => pool.sample()).rejects.toThrow(NoUpstreamError)
-  })
-
-  test('same', async () => {
-    const type = randStr()
-    const pool = new Pool(UPSTREAMS, type, { ttl: 10 })
-    await insertUpstreams({ type, host: randStr(), weight: 1 }, 10)
-    const upstream = await pool.sample()
-    for (let i = 0; i < 20; ++i) {
-      const sampled = await pool.sample({ type: 'same', upstream })
-      expect(sampled.id).toEqualUuid(upstream.id)
-    }
-    await deleteUpstreams({ type })
-  })
-
-  test('same but get different upstream', async () => {
-    const type = randStr()
-    const pool = new Pool(UPSTREAMS, type, { ttl: 10 })
-    await insertUpstreams({ type, host: randStr(), weight: 1 })
-    const id = toUuid()
-    for (let i = 0; i < 20; ++i) {
-      const upstream = await pool.sample({ type: 'same', upstream: id })
-      expect(upstream.id).not.toEqualUuid(id)
-    }
-    await deleteUpstreams({ type })
-  })
-
-  test('diff', async () => {
-    const type = randStr()
-    const pool = new Pool(UPSTREAMS, type, { ttl: 10 })
-    await insertUpstreams({ type, host: randStr(), weight: 1 }, 2)
-    const upstream = await pool.sample()
-    for (let i = 0; i < 20; ++i) {
-      const sampled = await pool.sample({ type: 'diff', upstream })
-      expect(sampled.id).not.toEqualUuid(upstream.id)
-    }
-    await deleteUpstreams({ type })
-  })
-
-  test('diff but get same upstream', async () => {
-    const type = randStr()
-    const pool = new Pool(UPSTREAMS, type, { ttl: 10 })
-    await insertUpstreams({ type, host: randStr(), weight: 1 }, 1)
-    const upstream = await pool.sample()
-    for (let i = 0; i < 20; ++i) {
-      const sampled = await pool.sample({ type: 'diff', upstream })
-      expect(sampled.id).toEqualUuid(upstream.id)
-    }
-    await deleteUpstreams({ type })
-  })
-
-  test('weight decay', async () => {
-    const type = randStr()
-    const pool = new Pool(UPSTREAMS, type, {
-      ttl: 10,
-      minFailures: 2,
-      decay: 0.5,
-    })
-    await insertUpstreams({ type, host: randStr(), weight: 1 }, 2)
-
-    const upstream = await pool.sample()
-    pool.fail(upstream) // failure: 1, weight: 1
-    pool.fail(upstream) // failure: 2, weight: 1 -> 0.5
-    pool.fail(upstream) // failure: 3, weight: 0.5 -> 0.25
-    pool.fail(upstream) // failure: 4, weight: 0.25 -> 0.125
-    pool.fail(upstream) // failure: 5, weight: 0.125 -> 0.0625
-
-    const total = 100
-    let hit = 0
-    for (let i = 0; i < total; ++i) {
-      const x = await pool.sample()
-      if (x.id.equals(upstream.id)) ++hit
-    }
-
-    // hit rate ~ 0.0625 / (1 + 0.0625) ~ 5.88%
-    let rate = hit / total
-    expect(rate >= 0.01 && rate <= 0.1).toBeTruthy()
-
-    pool.succeed(upstream) // reset to 1
-    hit = 0
-    for (let i = 0; i < total; ++i) {
-      const x = await pool.sample()
       if (x.id.equals(upstream.id)) ++hit
     }
     rate = hit / total

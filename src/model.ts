@@ -48,7 +48,7 @@ export const UUID_DOC_SCHEMA = {
 
 export type ObjectIdDoc = { _id: ObjectId } & Timestamp
 export const OBJECTID_DOC_SCHEMA = {
-  _id: { bsonType: 'binData' },
+  _id: { bsonType: 'objectId' },
   ...TIMESTAMP_SCHEMA,
 }
 
@@ -100,6 +100,15 @@ export function pickIdOrNil<Id>(x?: ModelLike<Id> | Id | null): Id | Nil {
 export type Options = CommandOperationOptions & {
   $now?: Date
   $max?: number
+}
+
+// Strip the model-level control fields ($now/$max) so only genuine driver
+// options reach mongodb.
+function toMongoOptions(options: Options): CommandOperationOptions {
+  const rest = { ...options }
+  delete rest.$now
+  delete rest.$max
+  return rest
 }
 
 export abstract class Models<
@@ -166,8 +175,13 @@ export abstract class Models<
 
   async find(id: ModelOrId<M>, options: Options = {}): Promise<M> {
     const _id = pickId(id)
+    // If a model instance was passed, return it as-is without hitting the DB
+    // (it is NOT re-fetched, so it may be stale relative to the database).
     if (_id !== id) return id as M
-    const found = await this.collection.findOne({ _id } as Filter<D>, options)
+    const found = await this.collection.findOne(
+      { _id } as Filter<D>,
+      toMongoOptions(options),
+    )
     if (isNullish(found)) throw new NotFoundError(`Not Found: ${this.name}`)
     return this.$model(found, options)
   }
@@ -178,7 +192,7 @@ export abstract class Models<
   ): Promise<TypeOrNil<M>> {
     const found = await this.collection.findOne(
       this.$query(query, options),
-      options,
+      toMongoOptions(options),
     )
     return isNullish(found) ? Nil : this.$model(found, options)
   }
@@ -188,7 +202,7 @@ export abstract class Models<
     pagination: Partial<Pagination<S>> = {},
     options: Options = {},
   ): Promise<M[]> {
-    return await this.iterate(query, pagination, options).toArray(options)
+    return await this.iterate(query, pagination, options).toArray()
   }
 
   async findManyToMapBy<T>(
@@ -209,7 +223,10 @@ export abstract class Models<
     options: Options = {},
   ): Cursor<D, M> {
     const { sort, offset, limit } = this.$paginate(pagination, options)
-    const cursor = this.collection.find(this.$query(query, options), options)
+    const cursor = this.collection.find(
+      this.$query(query, options),
+      toMongoOptions(options),
+    )
     if (!isNullish(sort)) cursor.sort(sort)
     cursor.skip(offset)
     if (limit !== Infinity) cursor.limit(limit)
@@ -235,7 +252,7 @@ export abstract class Models<
   async count(query: Q = {} as Q, options: Options = {}): Promise<number> {
     return await this.collection.countDocuments(
       this.$query(query, options),
-      options,
+      toMongoOptions(options),
     )
   }
 
@@ -248,7 +265,7 @@ export abstract class Models<
       } as OptionalUnlessRequiredId<D>
       const { acknowledged } = await this.collection.insertOne(
         inserted,
-        $options,
+        toMongoOptions($options),
       )
       if (acknowledged) return this.$model(inserted, $options)
     } catch (err) {
@@ -269,7 +286,7 @@ export abstract class Models<
       })) as OptionalUnlessRequiredId<D>[]
       const { acknowledged } = await this.collection.insertMany(
         inserted,
-        $options,
+        toMongoOptions($options),
       )
       if (acknowledged) return inserted.map((x) => this.$model(x, $options))
     } catch (err) {
@@ -293,7 +310,7 @@ export abstract class Models<
         $set: { updated_at: $options.$now, ...this.$set(values, $options) },
         $unset: this.$unset(values, $options),
       } as UpdateFilter<D>,
-      { returnDocument: 'after', ...$options },
+      { returnDocument: 'after', ...toMongoOptions($options) },
     )
     if (isNullish(updated)) throw new NotFoundError(`Not Found: ${this.name}`)
     return this.$model(updated, $options)
@@ -312,7 +329,7 @@ export abstract class Models<
         $set: { updated_at: $options.$now, ...this.$set(values, $options) },
         $unset: this.$unset(values, $options),
       } as UpdateFilter<D>,
-      $options,
+      toMongoOptions($options),
     )
     return modifiedCount
   }
@@ -320,7 +337,7 @@ export abstract class Models<
   async deleteOne(id: ModelOrId<M>, options: Options = {}): Promise<void> {
     const { deletedCount } = await this.collection.deleteOne(
       { _id: pickId(id) } as Filter<D>,
-      options,
+      toMongoOptions(options),
     )
     if (deletedCount !== 1) throw new NotFoundError(`Not Found: ${this.name}`)
   }
@@ -328,20 +345,17 @@ export abstract class Models<
   async deleteMany(query: Q = {} as Q, options: Options = {}): Promise<number> {
     const { deletedCount } = await this.collection.deleteMany(
       this.$query(query, options),
-      options,
+      toMongoOptions(options),
     )
     return deletedCount
   }
 }
 
 export class Cursor<D extends Doc<unknown>, M extends Model<D>> {
-  #model: (d: D | WithId<D>, options?: Options) => M
+  #model: (d: D | WithId<D>) => M
   #cursor: ExplainableCursor<D>
 
-  constructor(
-    model: (d: D | WithId<D>, options?: Options) => M,
-    cursor: ExplainableCursor<D>,
-  ) {
+  constructor(model: (d: D | WithId<D>) => M, cursor: ExplainableCursor<D>) {
     this.#model = model
     this.#cursor = cursor
   }
@@ -356,8 +370,8 @@ export class Cursor<D extends Doc<unknown>, M extends Model<D>> {
     }
   }
 
-  async toArray(options?: Options) {
-    return (await this.#cursor.toArray()).map((x) => this.#model(x, options))
+  async toArray() {
+    return (await this.#cursor.toArray()).map((x) => this.#model(x))
   }
 }
 
