@@ -1,54 +1,94 @@
 {
   "name": "@potentia/model7",
   "version": "1.1.0",
-  "description": "model",
-  "main": "./index.js",
+  "description": "cross-runtime model utilities for mongodb^7.0.0 on node.js, bun and deno",
+  "type": "module",
+  "main": "./model.js",
+  "types": "./model.d.ts",
   "scripts": {
     "clean": "rimraf dist",
     "dist": "tsc",
-    "fix": "npm run lint && npm run pretty",
+    "dist:release": "tsc --sourceMap false",
     "lint": "eslint --fix .",
     "pretty": "prettier --write .",
-    "test": "NODE_OPTIONS=--experimental-vm-modules npx jest"
+    "fix": "npm run lint && npm run pretty",
+    "test": "npm run dist && npm run test:node && npm run smoke",
+    "test:node": "node --test --experimental-test-coverage 'dist/test/**/*.js'",
+    "test:deno": "deno test -A dist/test/",
+    "smoke": "node smoke.mjs",
+    "smoke:bun": "bun smoke.mjs",
+    "smoke:deno": "deno run -A smoke.mjs"
   },
   "author": "Potentia Computing Inc.",
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@tsconfig/node24": "^24.0.0",
-    "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.0.0",
-    "eslint-plugin-jest": "^29.0.0",
     "globals": "^17.0.0",
-    "jest": "^30.0.0",
-    "jest-extended": "^7.0.0",
     "prettier": "^3.0.0",
     "rimraf": "^6.0.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.0.0"
   },
-  "peerDependencies": {
-    "@potentia/mongodb7": "github:potentia-inc/ts-mongodb7#semver:^1.0.0",
-    "@potentia/util": "github:potentia-inc/ts-util#semver:^3.5.0"
+  "dependencies": {
+    "@potentia/mongodb7": "github:potentia-inc/ts-mongodb7#2.0.0",
+    "@potentia/util": "github:potentia-inc/ts-util#4.2.0"
   },
-  "type": "module",
+  "peerDependencies": {
+    "mongodb": "^7.0.0"
+  },
   "exports": {
-    ".": "./model.js",
-    "./error": "./error.js",
-    "./error/lock": "./error/lock.js",
-    "./error/upstream": "./error/upstream.js",
-    "./lock": "./lock.js",
-    "./mongo": "./mongo.js",
-    "./type": "./type.js",
-    "./upstream": "./upstream.js",
-    "./upstream/pool": "./upstream-pool.js",
-    "./util": "./util.js"
+    ".": {
+      "types": "./model.d.ts",
+      "default": "./model.js"
+    },
+    "./error": {
+      "types": "./error.d.ts",
+      "default": "./error.js"
+    },
+    "./error/lock": {
+      "types": "./error/lock.d.ts",
+      "default": "./error/lock.js"
+    },
+    "./error/upstream": {
+      "types": "./error/upstream.d.ts",
+      "default": "./error/upstream.js"
+    },
+    "./lock": {
+      "types": "./lock.d.ts",
+      "default": "./lock.js"
+    },
+    "./mongo": {
+      "types": "./mongo.d.ts",
+      "default": "./mongo.js"
+    },
+    "./type": {
+      "types": "./type.d.ts",
+      "default": "./type.js"
+    },
+    "./upstream": {
+      "types": "./upstream.d.ts",
+      "default": "./upstream.js"
+    },
+    "./upstream/pool": {
+      "types": "./upstream-pool.d.ts",
+      "default": "./upstream-pool.js"
+    },
+    "./upstream/rate-limiter": {
+      "types": "./upstream-rate-limiter.d.ts",
+      "default": "./upstream-rate-limiter.js"
+    },
+    "./util": {
+      "types": "./util.d.ts",
+      "default": "./util.js"
+    }
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=22.0.0"
   }
 }

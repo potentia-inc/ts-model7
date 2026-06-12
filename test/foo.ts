@@ -11,7 +11,7 @@ import {
   toUnsetOrNil,
   toRangeOrNil,
 } from '../src/model.js'
-import { toUuid } from '../src/type.js'
+import { Uuid } from '../src/type.js'
 import { option } from '../src/util.js'
 
 export const FOO_NAME = 'foos'
@@ -104,7 +104,7 @@ export class Foos extends Models<
   }
 
   $insert(values: FooInsert): InsertionOf<FooDoc> {
-    const _id = values.id ?? toUuid()
+    const _id = values.id ?? new Uuid()
     return { _id, foo: values.foo, bar: values.bar }
   }
 

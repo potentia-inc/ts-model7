@@ -1,7 +1,11 @@
-import assert from 'node:assert'
+import { strict as assert } from 'node:assert'
 import { randomBytes } from 'node:crypto'
+import { after, before, describe, test } from 'node:test'
 import { ConflictError, NotFoundError } from '../src/error.js'
 import {
+  Model,
+  Models,
+  StringDoc,
   getSortKey,
   toExistsOrNil,
   toUnsetOrNil,
@@ -11,22 +15,23 @@ import {
   toRangeOrNil,
 } from '../src/model.js'
 import { Connection } from '../src/mongo.js'
-import { Nil, isNullish, toUuid } from '../src/type.js'
+import { Nil, Uuid, isNullish } from '../src/type.js'
 import { FOO_SCHEMA, Foos } from './foo.js'
 import { BAR_SCHEMA, Bars } from './bar.js'
+import { date, match, string, uuid } from './assert.js'
 
 const { MONGO_URI } = process.env
 assert(!isNullish(MONGO_URI))
-export const CONNECTION = new Connection(MONGO_URI)
+const CONNECTION = new Connection(MONGO_URI)
 
-beforeAll(async () => {
+before(async () => {
   await CONNECTION.connect()
 
   await CONNECTION.migrate(FOO_SCHEMA)
   await CONNECTION.migrate(BAR_SCHEMA)
 })
 
-afterAll(async () => {
+after(async () => {
   await CONNECTION.disconnect()
 })
 
@@ -39,82 +44,61 @@ describe('model', () => {
 
     // insertOne and insertMany
     const test = await FOOS.insertOne({ foo })
-    expect(test).toMatchObject({
-      id: expect.toBeUuid(),
-      foo,
-      createdAt: expect.toBeDate(),
-    })
-    await expect(() =>
+    match(test, { id: uuid(), foo, createdAt: date() })
+    await assert.rejects(
       FOOS.insertOne({ id: test.id, foo: foo2 }),
-    ).rejects.toThrow(ConflictError)
-    await expect(() => FOOS.insertOne({ foo })).rejects.toThrow(ConflictError)
-    expect(await FOOS.insertMany([{ foo: foo2 }])).toMatchObject([
-      {
-        id: expect.toBeUuid(),
-        foo: foo2,
-        createdAt: expect.toBeDate(),
-      },
-    ])
-    await expect(() => FOOS.insertMany([{ foo: foo2 }])).rejects.toThrow(
       ConflictError,
     )
+    await assert.rejects(FOOS.insertOne({ foo }), ConflictError)
+    match(await FOOS.insertMany([{ foo: foo2 }]), [
+      { id: uuid(), foo: foo2, createdAt: date() },
+    ])
+    await assert.rejects(FOOS.insertMany([{ foo: foo2 }]), ConflictError)
 
     // find, findOne, findMany
-    expect(await FOOS.find(test)).toMatchObject({
+    match(await FOOS.find(test), {
       id: test.id,
       foo: test.foo,
-      createdAt: expect.toEqualDate(test.createdAt),
+      createdAt: date(test.createdAt),
     })
-    expect(await FOOS.find(test.id)).toMatchObject({
+    match(await FOOS.find(test.id), {
       id: test.id,
       foo: test.foo,
-      createdAt: expect.toEqualDate(test.createdAt),
+      createdAt: date(test.createdAt),
     })
-    await expect(() => FOOS.find(toUuid())).rejects.toThrow(NotFoundError)
-    expect(await FOOS.findOne({ id: test })).toMatchObject({
+    await assert.rejects(FOOS.find(new Uuid()), NotFoundError)
+    match(await FOOS.findOne({ id: test }), {
       id: test.id,
       foo: test.foo,
-      createdAt: expect.toEqualDate(test.createdAt),
+      createdAt: date(test.createdAt),
     })
-    expect(await FOOS.findOne({ id: test.id })).toMatchObject({
+    match(await FOOS.findOne({ id: test.id }), {
       id: test.id,
       foo: test.foo,
-      createdAt: expect.toEqualDate(test.createdAt),
+      createdAt: date(test.createdAt),
     })
     const pagination = {
       offest: 0,
       limit: 100,
       sort: { createdAt: 'asc' },
     } as const
-    expect(await FOOS.findMany({}, pagination)).toMatchObject([
-      {
-        id: expect.toBeUuid(),
-        foo: expect.any(String),
-        createdAt: expect.toBeDate(),
-      },
-      {
-        id: expect.toBeUuid(),
-        foo: expect.any(String),
-        createdAt: expect.toBeDate(),
-      },
+    match(await FOOS.findMany({}, pagination), [
+      { id: uuid(), foo: string, createdAt: date() },
+      { id: uuid(), foo: string, createdAt: date() },
     ])
 
     // count, iterate, paginate
-    expect(await FOOS.count({})).toBe(2)
-    for await (const test of FOOS.iterate({}, pagination)) {
-      expect(test).toMatchObject({
-        id: expect.toBeUuid(),
-        foo: expect.any(String),
-        createdAt: expect.toBeDate(),
-      })
+    assert.equal(await FOOS.count({}), 2)
+    for await (const x of FOOS.iterate({}, pagination)) {
+      match(x, { id: uuid(), foo: string, createdAt: date() })
     }
 
     // findManyToMapBy
     const map = await FOOS.findManyToMapBy((x) => String(x.id), {}, pagination)
-    expect(map.size).toBe(2)
-    expect(map.get(String(test.id))).toMatchObject(test)
+    assert.equal(map.size, 2)
+    match(map.get(String(test.id)), test)
 
-    expect(
+    match(
       await FOOS.paginate(
         {
           createdIn: {
@@ -128,22 +112,12 @@ describe('model', () => {
           limit: 100,
         },
       ),
-    ).toMatchObject([
-      {
-        sort: { createdAt: 'asc' },
-        offset: 0,
-        limit: 100,
-        count: 1,
-      },
       [
-        {
-          id: expect.toBeUuid(),
-          foo: expect.any(String),
-          createdAt: expect.toBeDate(),
-        },
+        { sort: { createdAt: 'asc' }, offset: 0, limit: 100, count: 1 },
+        [{ id: uuid(), foo: string, createdAt: date() }],
       ],
-    ])
-    expect(
+    )
+    match(
       await FOOS.paginate(
         { createdIn: { end: test.createdAt } },
         {
@@ -152,44 +126,38 @@ describe('model', () => {
           limit: 100,
         },
       ),
-    ).toMatchObject([
-      {
-        sort: { createdAt: 'asc' },
-        offset: 0,
-        limit: 100,
-        count: 0,
-      },
-      [],
-    ])
+      [{ sort: { createdAt: 'asc' }, offset: 0, limit: 100, count: 0 }, []],
+    )
 
     // updateOne, updateMany
-    await expect(() => FOOS.updateOne(toUuid(), { bar: 123 })).rejects.toThrow(
+    await assert.rejects(
+      FOOS.updateOne({ id: new Uuid() }, { bar: 123 }),
       NotFoundError,
     )
-    expect(await FOOS.updateOne(test, { bar: 123 })).toMatchObject({
+    match(await FOOS.updateOne({ id: test }, { bar: 123 }), {
       id: test.id,
       foo: test.foo,
       bar: 123,
-      createdAt: expect.toEqualDate(test.createdAt),
-      updatedAt: expect.toBeDate(),
+      createdAt: date(test.createdAt),
+      updatedAt: date(),
     })
-    expect(await FOOS.updateOne(test, { bar: Nil })).toMatchObject({
+    match(await FOOS.updateOne({ id: test }, { bar: Nil }), {
       id: test.id,
       foo: test.foo,
       bar: Nil,
-      createdAt: expect.toEqualDate(test.createdAt),
-      updatedAt: expect.toBeDate(),
+      createdAt: date(test.createdAt),
+      updatedAt: date(),
     })
-    expect(await FOOS.updateMany({ foo: foo2 }, { bar: 456 })).toBe(1)
-    expect(await FOOS.updateMany({ foo: randStr() }, { bar: 789 })).toBe(0)
+    assert.equal(await FOOS.updateMany({ foo: foo2 }, { bar: 456 }), 1)
+    assert.equal(await FOOS.updateMany({ foo: randStr() }, { bar: 789 }), 0)
 
     // deleteOne, deleteMany
-    await expect(() => FOOS.deleteOne(toUuid())).rejects.toThrow(NotFoundError)
-    await FOOS.deleteOne(test)
-    expect(await FOOS.findOne({ id: test })).toBeNil()
-    await expect(() => FOOS.deleteOne(test)).rejects.toThrow(NotFoundError)
-    expect(await FOOS.deleteMany({})).toBe(1)
-    expect(await FOOS.deleteMany({})).toBe(0)
+    await assert.rejects(FOOS.deleteOne({ id: new Uuid() }), NotFoundError)
+    await FOOS.deleteOne({ id: test })
+    assert.equal(await FOOS.findOne({ id: test }), Nil)
+    await assert.rejects(FOOS.deleteOne({ id: test }), NotFoundError)
+    assert.equal(await FOOS.deleteMany({}), 1)
+    assert.equal(await FOOS.deleteMany({}), 0)
   })
 
   test('CRUD for Bar', async () => {
@@ -199,116 +167,75 @@ describe('model', () => {
 
     // insertOne and insertMany
     const test = await BARS.insertOne({
-      id: { foo: toUuid(), bar: randStr() },
+      id: { foo: new Uuid(), bar: randStr() },
       foo,
     })
-    expect(test).toMatchObject({
-      id: {
-        foo: expect.toBeUuid(),
-        bar: expect.any(String),
-      },
+    match(test, {
+      id: { foo: uuid(), bar: string },
       foo,
-      createdAt: expect.toBeDate(),
+      createdAt: date(),
     })
-    await expect(() =>
+    await assert.rejects(
       BARS.insertOne({ id: test.id, foo: foo2 }),
-    ).rejects.toThrow(ConflictError)
-    await expect(() =>
-      BARS.insertOne({
-        id: { foo: toUuid(), bar: randStr() },
-        foo,
-      }),
-    ).rejects.toThrow(ConflictError)
-    expect(
+      ConflictError,
+    )
+    await assert.rejects(
+      BARS.insertOne({ id: { foo: new Uuid(), bar: randStr() }, foo }),
+      ConflictError,
+    )
+    match(
       await BARS.insertMany([
-        {
-          id: { foo: toUuid(), bar: randStr() },
-          foo: foo2,
-        },
+        { id: { foo: new Uuid(), bar: randStr() }, foo: foo2 },
       ]),
-    ).toMatchObject([
-      {
-        id: {
-          foo: expect.toBeUuid(),
-          bar: expect.any(String),
-        },
-        foo: foo2,
-        createdAt: expect.toBeDate(),
-      },
-    ])
-    await expect(() =>
-      BARS.insertMany([
-        {
-          id: { foo: toUuid(), bar: randStr() },
-          foo: foo2,
-        },
-      ]),
-    ).rejects.toThrow(ConflictError)
+      [{ id: { foo: uuid(), bar: string }, foo: foo2, createdAt: date() }],
+    )
+    await assert.rejects(
+      BARS.insertMany([{ id: { foo: new Uuid(), bar: randStr() }, foo: foo2 }]),
+      ConflictError,
+    )
 
     // find, findOne, findMany
-    expect(await BARS.find(test)).toMatchObject({
+    match(await BARS.find(test), {
       id: test.id,
       foo: test.foo,
-      createdAt: expect.toEqualDate(test.createdAt),
+      createdAt: date(test.createdAt),
     })
-    expect(await BARS.find(test.id)).toMatchObject({
+    match(await BARS.find(test.id), {
       id: test.id,
       foo: test.foo,
-      createdAt: expect.toEqualDate(test.createdAt),
+      createdAt: date(test.createdAt),
     })
-    await expect(() =>
-      BARS.find({ foo: toUuid(), bar: randStr() }),
-    ).rejects.toThrow(NotFoundError)
-    await expect(() =>
-      BARS.find({
-        foo: toUuid(),
-        bar: randStr(),
-      }),
-    ).rejects.toThrow(NotFoundError)
-    expect(await BARS.findOne({ id: test })).toMatchObject({
+    await assert.rejects(
+      BARS.find({ foo: new Uuid(), bar: randStr() }),
+      NotFoundError,
+    )
+    match(await BARS.findOne({ id: test }), {
       id: test.id,
       foo: test.foo,
-      createdAt: expect.toEqualDate(test.createdAt),
+      createdAt: date(test.createdAt),
     })
-    expect(await BARS.findOne({ id: test.id })).toMatchObject({
+    match(await BARS.findOne({ id: test.id }), {
       id: test.id,
       foo: test.foo,
-      createdAt: expect.toEqualDate(test.createdAt),
+      createdAt: date(test.createdAt),
     })
     const pagination = {
       offest: 0,
       limit: 100,
       sort: { createdAt: 'asc' },
     } as const
-    expect(await BARS.findMany({}, pagination)).toMatchObject([
-      {
-        id: {
-          foo: expect.toBeUuid(),
-          bar: expect.any(String),
-        },
-        foo: expect.any(String),
-        createdAt: expect.toBeDate(),
-      },
-      {
-        id: {
-          foo: expect.toBeUuid(),
-          bar: expect.any(String),
-        },
-        foo: expect.any(String),
-        createdAt: expect.toBeDate(),
-      },
+    match(await BARS.findMany({}, pagination), [
+      { id: { foo: uuid(), bar: string }, foo: string, createdAt: date() },
+      { id: { foo: uuid(), bar: string }, foo: string, createdAt: date() },
     ])
 
     // count, iterate, paginate
-    expect(await BARS.count({})).toBe(2)
-    for await (const test of BARS.iterate({}, pagination)) {
-      expect(test).toMatchObject({
-        id: {
-          foo: expect.toBeUuid(),
-          bar: expect.any(String),
-        },
-        foo: expect.any(String),
-        createdAt: expect.toBeDate(),
+    assert.equal(await BARS.count({}), 2)
+    for await (const x of BARS.iterate({}, pagination)) {
+      match(x, {
+        id: { foo: uuid(), bar: string },
+        foo: string,
+        createdAt: date(),
       })
     }
 
@@ -318,10 +245,10 @@ describe('model', () => {
       {},
       pagination,
     )
-    expect(map.size).toBe(2)
-    expect(map.get(`${String(test.id.foo)}:${test.id.bar}`)).toMatchObject(test)
+    assert.equal(map.size, 2)
+    match(map.get(`${String(test.id.foo)}:${test.id.bar}`), test)
 
-    expect(
+    match(
       await BARS.paginate(
         {
           createdIn: {
@@ -335,25 +262,18 @@ describe('model', () => {
           limit: 100,
         },
       ),
-    ).toMatchObject([
-      {
-        sort: { createdAt: 'asc' },
-        offset: 0,
-        limit: 100,
-        count: 1,
-      },
       [
-        {
-          id: {
-            foo: expect.toBeUuid(),
-            bar: expect.any(String),
+        { sort: { createdAt: 'asc' }, offset: 0, limit: 100, count: 1 },
+        [
+          {
+            id: { foo: uuid(), bar: string },
+            foo: string,
+            createdAt: date(),
           },
-          foo: expect.any(String),
-          createdAt: expect.toBeDate(),
-        },
+        ],
       ],
-    ])
-    expect(
+    )
+    match(
       await BARS.paginate(
         { createdIn: { end: test.createdAt } },
         {
@@ -362,150 +282,165 @@ describe('model', () => {
           limit: 100,
         },
       ),
-    ).toMatchObject([
-      {
-        sort: { createdAt: 'asc' },
-        offset: 0,
-        limit: 100,
-        count: 1,
-      },
       [
-        {
-          id: {
-            foo: expect.toBeUuid(),
-            bar: expect.any(String),
+        { sort: { createdAt: 'asc' }, offset: 0, limit: 100, count: 1 },
+        [
+          {
+            id: { foo: uuid(), bar: string },
+            foo: string,
+            createdAt: date(),
           },
-          foo: expect.any(String),
-          createdAt: expect.toBeDate(),
-        },
+        ],
       ],
-    ])
+    )
 
     // updateOne, updateMany
-    await expect(() =>
-      BARS.updateOne(
-        {
-          foo: toUuid(),
-          bar: randStr(),
-        },
-        { bar: 123 },
-      ),
-    ).rejects.toThrow(NotFoundError)
-    expect(await BARS.updateOne(test, { bar: 123 })).toMatchObject({
+    await assert.rejects(
+      BARS.updateOne({ id: { foo: new Uuid(), bar: randStr() } }, { bar: 123 }),
+      NotFoundError,
+    )
+    match(await BARS.updateOne({ id: test }, { bar: 123 }), {
       id: test.id,
       foo: test.foo,
       bar: 123,
-      createdAt: expect.toEqualDate(test.createdAt),
-      updatedAt: expect.toBeDate(),
+      createdAt: date(test.createdAt),
+      updatedAt: date(),
     })
-    expect(await BARS.updateOne(test, { bar: Nil })).toMatchObject({
+    match(await BARS.updateOne({ id: test }, { bar: Nil }), {
       id: test.id,
       foo: test.foo,
       bar: Nil,
-      createdAt: expect.toEqualDate(test.createdAt),
-      updatedAt: expect.toBeDate(),
+      createdAt: date(test.createdAt),
+      updatedAt: date(),
     })
-    expect(await BARS.updateMany({ foo: foo2 }, { bar: 456 })).toBe(1)
-    expect(await BARS.updateMany({ foo: randStr() }, { bar: 789 })).toBe(0)
+    assert.equal(await BARS.updateMany({ foo: foo2 }, { bar: 456 }), 1)
+    assert.equal(await BARS.updateMany({ foo: randStr() }, { bar: 789 }), 0)
 
     // deleteOne, deleteMany
-    await expect(() =>
-      BARS.deleteOne({
-        foo: toUuid(),
-        bar: randStr(),
-      }),
-    ).rejects.toThrow(NotFoundError)
-    await BARS.deleteOne(test)
-    expect(await BARS.findOne({ id: test })).toBeNil()
-    await expect(() => BARS.deleteOne(test)).rejects.toThrow(NotFoundError)
-    expect(await BARS.deleteMany({})).toBe(1)
-    expect(await BARS.deleteMany({})).toBe(0)
+    await assert.rejects(
+      BARS.deleteOne({ id: { foo: new Uuid(), bar: randStr() } }),
+      NotFoundError,
+    )
+    await BARS.deleteOne({ id: test })
+    assert.equal(await BARS.findOne({ id: test }), Nil)
+    await assert.rejects(BARS.deleteOne({ id: test }), NotFoundError)
+    assert.equal(await BARS.deleteMany({}), 1)
+    assert.equal(await BARS.deleteMany({}), 0)
   })
 
   test('getSortKey()', () => {
-    expect(getSortKey(Nil)).toBeNil()
-    expect(getSortKey('foo')).toBe('foo')
-    expect(getSortKey(['foo'])).toBe('foo')
-    expect(getSortKey([['foo', 1]])).toBe('foo')
-    expect(getSortKey({ foo: 1 })).toBe('foo')
+    assert.equal(getSortKey(Nil), Nil)
+    assert.equal(getSortKey('foo'), 'foo')
+    assert.equal(getSortKey(['foo']), 'foo')
+    assert.equal(getSortKey([['foo', 1]]), 'foo')
+    assert.equal(getSortKey({ foo: 1 }), 'foo')
     const map = new Map()
     map.set('foo', 1)
-    expect(getSortKey(map)).toBe('foo')
+    assert.equal(getSortKey(map), 'foo')
   })
 
   test('query builders', () => {
-    expect(toValueOrAbsent(Nil)).toMatchObject({ $exists: false })
-    expect(toValueOrAbsent(null)).toMatchObject({ $exists: false })
-    expect(toValueOrAbsent(true)).toBe(true)
-    expect(toValueOrAbsent(false)).toBe(false)
-    expect(toValueOrAbsent(123)).toBe(123)
-    expect(toValueOrAbsent('foo')).toBe('foo')
-    expect(toValueOrAbsent([0, 1])).toMatchObject([0, 1])
-    expect(toValueOrAbsent({ foo: 'bar' })).toMatchObject({ foo: 'bar' })
+    match(toValueOrAbsent(Nil), { $exists: false })
+    match(toValueOrAbsent(null), { $exists: false })
+    assert.equal(toValueOrAbsent(true), true)
+    assert.equal(toValueOrAbsent(false), false)
+    assert.equal(toValueOrAbsent(123), 123)
+    assert.equal(toValueOrAbsent('foo'), 'foo')
+    match(toValueOrAbsent([0, 1]), [0, 1])
+    match(toValueOrAbsent({ foo: 'bar' }), { foo: 'bar' })
 
-    expect(toValueOrAbsentOrNil({ foo: Nil }, 'foo')).toMatchObject({
-      $exists: false,
-    })
-    expect(toValueOrAbsentOrNil({} as { foo?: string }, 'foo')).toBeNil()
-    expect(toValueOrAbsentOrNil({ foo: 'bar' }, 'foo')).toBe('bar')
-    expect(toValueOrAbsentOrNil({ foo: 'bar' }, 'foo', (x) => x?.length)).toBe(
+    match(toValueOrAbsentOrNil({ foo: Nil }, 'foo'), { $exists: false })
+    assert.equal(toValueOrAbsentOrNil({} as { foo?: string }, 'foo'), Nil)
+    assert.equal(toValueOrAbsentOrNil({ foo: 'bar' }, 'foo'), 'bar')
+    assert.equal(
+      toValueOrAbsentOrNil({ foo: 'bar' }, 'foo', (x) => x?.length),
       3,
     )
 
-    expect(toExistsOrNil(Nil)).toBe(Nil)
-    expect(toExistsOrNil(null)).toBe(Nil)
-    expect(toExistsOrNil(true)).toMatchObject({ $exists: true })
-    expect(toExistsOrNil(false)).toMatchObject({ $exists: false })
+    assert.equal(toExistsOrNil(Nil), Nil)
+    assert.equal(toExistsOrNil(null), Nil)
+    match(toExistsOrNil(true), { $exists: true })
+    match(toExistsOrNil(false), { $exists: false })
 
-    expect(toUnsetOrNil<{ foo?: unknown }>({}, 'foo')).toBe(Nil)
-    expect(toUnsetOrNil({ foo: 'bar' }, 'foo')).toBe(Nil)
-    expect(toUnsetOrNil({ foo: Nil }, 'foo')).toBe(true)
-    expect(toUnsetOrNil({ foo: null }, 'foo')).toBe(true)
+    assert.equal(toUnsetOrNil<{ foo?: unknown }>({}, 'foo'), Nil)
+    assert.equal(toUnsetOrNil({ foo: 'bar' }, 'foo'), Nil)
+    assert.equal(toUnsetOrNil({ foo: Nil }, 'foo'), true)
+    assert.equal(toUnsetOrNil({ foo: null }, 'foo'), true)
 
-    expect(toValueOrInOrNil(Nil)).toBe(Nil)
-    expect(toValueOrInOrNil(null)).toBe(Nil)
-    expect(toValueOrInOrNil('foo')).toBe('foo')
-    expect(toValueOrInOrNil(['foo', 'bar'])).toMatchObject({
-      $in: ['foo', 'bar'],
-    })
+    assert.equal(toValueOrInOrNil(Nil), Nil)
+    assert.equal(toValueOrInOrNil(null), Nil)
+    assert.equal(toValueOrInOrNil('foo'), 'foo')
+    match(toValueOrInOrNil(['foo', 'bar']), { $in: ['foo', 'bar'] })
     const arr = ['foo', 'bar'] as const
-    expect(toValueOrInOrNil(arr)).toMatchObject({
-      $in: ['foo', 'bar'],
-    })
-    expect(toValueOrInOrNil(['foo', 'bar'], (x) => x.length)).toMatchObject({
-      $in: [3, 3],
-    })
-    expect(
+    match(toValueOrInOrNil(arr), { $in: ['foo', 'bar'] })
+    match(
+      toValueOrInOrNil(['foo', 'bar'], (x) => x.length),
+      { $in: [3, 3] },
+    )
+    match(
       toValueOrInOrNil(['foo', 'bar'] as const, (x) => x.length),
-    ).toMatchObject({
-      $in: [3, 3],
-    })
+      { $in: [3, 3] },
+    )
 
     const begin = new Date()
     const end = new Date()
-    expect(toRangeOrNil()).toBeNil()
-    expect(toRangeOrNil({})).toBeNil()
-    expect(toRangeOrNil({}, true)).toBeNil()
-    expect(toRangeOrNil({ begin })).toMatchObject({
-      $gte: expect.toEqualDate(begin),
+    assert.equal(toRangeOrNil(), Nil)
+    assert.equal(toRangeOrNil({}), Nil)
+    assert.equal(toRangeOrNil({}, true), Nil)
+    match(toRangeOrNil({ begin }), { $gte: date(begin) })
+    match(toRangeOrNil({ begin }, true), { $gte: date(begin) })
+    match(toRangeOrNil({ begin, end }), { $gte: date(begin), $lt: date(end) })
+    match(toRangeOrNil({ begin, end }, true), {
+      $gte: date(begin),
+      $lte: date(end),
     })
-    expect(toRangeOrNil({ begin }, true)).toMatchObject({
-      $gte: expect.toEqualDate(begin),
+    match(toRangeOrNil({ end }), { $lt: date(end) })
+    match(toRangeOrNil({ end }, true), { $lte: date(end) })
+  })
+
+  test('base Models defaults', async () => {
+    // a model that overrides only the required hooks, exercising the base
+    // $query / $set / $unset / $sort defaults ({} / {} / {} / Nil)
+    class Baz extends Model<StringDoc> {}
+    class Bazs extends Models<
+      StringDoc,
+      Baz,
+      object,
+      { id: string },
+      object,
+      object
+    > {
+      get name(): string {
+        return 'bazs'
+      }
+      $model(doc: StringDoc): Baz {
+        return new Baz(doc)
+      }
+      $insert(values: { id: string }) {
+        return { _id: values.id }
+      }
+    }
+
+    await CONNECTION.migrate({ name: 'bazs' })
+    const BAZS = new Bazs({ connection: CONNECTION })
+    await BAZS.deleteMany({})
+
+    const baz = await BAZS.insertOne({ id: randStr() })
+    // base $query returns {} -> matches everything
+    match(await BAZS.findOne({}), {
+      id: baz.id,
+      createdAt: date(baz.createdAt),
     })
-    expect(toRangeOrNil({ begin, end })).toMatchObject({
-      $gte: expect.toEqualDate(begin),
-      $lt: expect.toEqualDate(end),
+    // base $sort returns Nil
+    assert.equal((await BAZS.findMany({}, { sort: {} })).length, 1)
+    // base $inc/$set/$unset return {} -> the update only bumps updated_at
+    match(await BAZS.updateOne({}, {}), {
+      id: baz.id,
+      createdAt: date(baz.createdAt),
+      updatedAt: date(),
     })
-    expect(toRangeOrNil({ begin, end }, true)).toMatchObject({
-      $gte: expect.toEqualDate(begin),
-      $lte: expect.toEqualDate(end),
-    })
-    expect(toRangeOrNil({ end })).toMatchObject({
-      $lt: expect.toEqualDate(end),
-    })
-    expect(toRangeOrNil({ end }, true)).toMatchObject({
-      $lte: expect.toEqualDate(end),
-    })
+
+    await BAZS.deleteMany({})
   })
 })
 

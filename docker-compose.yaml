@@ -30,15 +30,56 @@ services:
             { force: true },
           );
         EOF
-  test:
-    build: { context: . }
-    depends_on: [init-mongo]
+
+  node:
+    build:
+      context: .
+      dockerfile: Dockerfile.node
+    depends_on:
+      init-mongo:
+        condition: service_completed_successfully
     environment:
-      MONGO_URI: mongodb://mongo0,mongo1,mongo2/test?replicaSet=rs0
+      # a per-runtime database keeps the sequential node/bun/deno runs (which
+      # share this replica set) from seeing each other's leftover documents
+      MONGO_URI: mongodb://mongo0,mongo1,mongo2/test_node?replicaSet=rs0
     restart: 'no'
     entrypoint: ['/bin/sh', '-c']
     command:
       - |
+        set -e
         npm run lint
-        npm run pretty
-        npm run test
+        npm run test:node
+        npm run smoke
+
+  bun:
+    build:
+      context: .
+      dockerfile: Dockerfile.bun
+    depends_on:
+      init-mongo:
+        condition: service_completed_successfully
+    environment:
+      MONGO_URI: mongodb://mongo0,mongo1,mongo2/test_bun?replicaSet=rs0
+    restart: 'no'
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        set -e
+        bun smoke.mjs
+
+  deno:
+    build:
+      context: .
+      dockerfile: Dockerfile.deno
+    depends_on:
+      init-mongo:
+        condition: service_completed_successfully
+    environment:
+      MONGO_URI: mongodb://mongo0,mongo1,mongo2/test_deno?replicaSet=rs0
+    restart: 'no'
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        set -e
+        deno test -A dist/test/
+        deno run -A smoke.mjs

@@ -1,22 +1,24 @@
-import assert from 'node:assert'
+import { strict as assert } from 'node:assert'
 import { randomBytes } from 'node:crypto'
+import { after, before, describe, test } from 'node:test'
 import { setImmediate } from 'node:timers/promises'
 import { LockError, RelockError, UnlockError } from '../src/error/lock.js'
 import { LOCK_SCHEMA, Locks } from '../src/lock.js'
 import { Connection } from '../src/mongo.js'
 import { isNullish } from '../src/type.js'
 import { sleep } from '../src/util.js'
+import { date, match } from './assert.js'
 
 const { MONGO_URI } = process.env
 assert(!isNullish(MONGO_URI))
-export const CONNECTION = new Connection(MONGO_URI)
+const CONNECTION = new Connection(MONGO_URI)
 
-beforeAll(async () => {
+before(async () => {
   await CONNECTION.connect()
   await CONNECTION.migrate(LOCK_SCHEMA)
 })
 
-afterAll(async () => {
+after(async () => {
   await CONNECTION.disconnect()
 })
 
@@ -31,53 +33,57 @@ describe('lock', () => {
         await sleep(10000)
         return true
       },
-      { ttl: 3 },
+      { ttl: '3s' },
     )
     await setImmediate()
 
     const exec = () => Promise.resolve(true)
-    await expect(() => LOCKS.lock(id, exec)).rejects.toThrow(LockError)
+    await assert.rejects(LOCKS.lock(id, exec), LockError)
     await sleep(5000)
-    await expect(() => LOCKS.lock(id, exec)).rejects.toThrow(LockError)
+    await assert.rejects(LOCKS.lock(id, exec), LockError)
     await sleep(4000)
-    await expect(() => LOCKS.lock(id, exec)).rejects.toThrow(LockError)
+    await assert.rejects(LOCKS.lock(id, exec), LockError)
     await sleep(4000)
-    expect(await LOCKS.lock(id, exec)).toBe(true)
-    expect(await promise).toBe(true)
+    assert.equal(await LOCKS.lock(id, exec), true)
+    assert.equal(await promise, true)
 
     const lock = await LOCKS.insertOne({
       id: randStr(),
       expiresAt: new Date(Date.now() + 10000),
     })
-    expect(await LOCKS.findOne({ id: lock.id })).toMatchObject({
+    match(await LOCKS.findOne({ id: lock.id }), {
       id: lock.id,
-      expiresAt: expect.toEqualDate(lock.expiresAt),
-      createdAt: expect.toBeDate(),
+      expiresAt: date(lock.expiresAt),
+      createdAt: date(),
     })
 
-    expect(await LOCKS.findMany()).toHaveLength(1)
-    expect(
-      await LOCKS.findMany({}, { sort: { createdAt: 'asc' } }),
-    ).toHaveLength(1)
-    expect(
-      await LOCKS.findMany({}, { sort: { expiresAt: 'asc' } }),
-    ).toHaveLength(1)
+    assert.equal((await LOCKS.findMany()).length, 1)
+    assert.equal(
+      (await LOCKS.findMany({}, { sort: { createdAt: 'asc' } })).length,
+      1,
+    )
+    assert.equal(
+      (await LOCKS.findMany({}, { sort: { expiresAt: 'asc' } })).length,
+      1,
+    )
   })
 
   test('user exception', async () => {
     const id = randStr()
-    await expect(() =>
+    await assert.rejects(
       LOCKS.lock(id, () => {
         throw new Error('foobar')
       }),
-    ).rejects.toThrow(/foobar/)
+      /foobar/,
+    )
   })
 
   test('LockError', async () => {
     const id = randStr()
     const promise = LOCKS.lock(id, () => sleep(1000))
     await setImmediate()
-    await expect(() => LOCKS.lock(id, async () => true)).rejects.toThrow(
+    await assert.rejects(
+      LOCKS.lock(id, async () => true),
       LockError,
     )
     await promise
@@ -86,14 +92,17 @@ describe('lock', () => {
   test('RelockError', async () => {
     const id = randStr()
     const timeout = new Promise((resolve, reject) =>
-      setTimeout(() => LOCKS.deleteOne(id).then(resolve).catch(reject), 2000),
+      setTimeout(
+        () => LOCKS.deleteOne({ id }).then(resolve).catch(reject),
+        2000,
+      ),
     )
     let called = 0
     const onError = (err: unknown) => {
       ++called
-      expect(err).toBeInstanceOf(RelockError)
+      assert.ok(err instanceof RelockError)
     }
-    expect(
+    assert.equal(
       await LOCKS.lock(
         id,
         async (signal) => {
@@ -103,35 +112,40 @@ describe('lock', () => {
           }
           return true
         },
-        { ttl: 2, retries: 1, onError },
+        { ttl: '2s', retries: 1, onError },
       ),
-    ).toBe(false)
+      false,
+    )
     await timeout
-    expect(called).toBe(1)
+    assert.equal(called, 1)
   })
 
   test('UnlockError', async () => {
     const id = randStr()
     const timeout = new Promise((resolve, reject) =>
-      setTimeout(() => LOCKS.deleteOne(id).then(resolve).catch(reject), 3500),
+      setTimeout(
+        () => LOCKS.deleteOne({ id }).then(resolve).catch(reject),
+        3500,
+      ),
     )
     let called = 0
     const onError = (err: unknown) => {
       ++called
-      expect(err).toBeInstanceOf(UnlockError)
+      assert.ok(err instanceof UnlockError)
     }
-    expect(
+    assert.equal(
       await LOCKS.lock(
         id,
         async (signal) => {
           await sleep(3000)
           return !signal.aborted
         },
-        { ttl: 4, onError },
+        { ttl: '4s', onError },
       ),
-    ).toBe(true)
+      true,
+    )
     await timeout
-    expect(called).toBe(1)
+    assert.equal(called, 1)
   })
 })
 

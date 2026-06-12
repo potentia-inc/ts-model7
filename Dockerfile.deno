@@ -1,0 +1,14 @@
+# Build the package with the canonical toolchain (node + tsc) ...
+FROM node:24-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm clean-install
+COPY . .
+RUN npm run dist
+
+# ... then run the node:test suite and the smoke (both the built artifact) on
+# deno. The whole tree — including node_modules (mongodb, @potentia/*) — is
+# carried over so deno's node compatibility can resolve the runtime imports.
+FROM denoland/deno:latest
+WORKDIR /app
+COPY --from=build /app /app
