@@ -1,5 +1,6 @@
 import { Filter, InsertionOf, Model, ModelOrId, Models, UpdateFilter, UuidDoc } from './model.js';
 import { TypeOrNil } from './type.js';
+import { Duration } from './util.js';
 export declare const UPSTREAM_NAME = "upstreams";
 export type UpstreamOrId = ModelOrId<Upstream>;
 export type UpstreamOrNil = TypeOrNil<Upstream>;
@@ -103,7 +104,7 @@ export type UpstreamInsert = {
     headers?: Record<string, string>;
     searchs?: Record<string, string>;
     auth?: Record<string, string>;
-    interval?: number;
+    interval?: Duration;
     weight?: number;
 };
 export type UpstreamUpdate = {
@@ -113,7 +114,7 @@ export type UpstreamUpdate = {
     headers?: Record<string, string>;
     searchs?: Record<string, string>;
     auth?: Record<string, string>;
-    interval?: number;
+    interval?: Duration;
     weight?: number;
 };
 export type UpstreamSort = {
@@ -129,22 +130,5 @@ export declare class Upstreams extends Models<UpstreamDoc, Upstream, UpstreamQue
     $insert(values: UpstreamInsert): InsertionOf<UpstreamDoc>;
     $set(values: UpstreamUpdate): UpdateFilter<UpstreamDoc>;
     $unset(values: UpstreamUpdate): UpdateFilter<UpstreamDoc>;
-}
-type Hint = {
-    type: 'same' | 'diff';
-    upstream: UpstreamOrId;
-};
-type PoolOptions = {
-    ttl: number;
-    minFailures: number;
-    minWeight: number;
-    decay: number;
-};
-export declare class Pool {
-    #private;
-    constructor(upstreams: Upstreams, type: string, options?: Partial<PoolOptions>);
-    sample(hint?: Hint): Promise<Upstream>;
-    succeed(id: UpstreamOrId): void;
-    fail(id: UpstreamOrId): void;
 }
 export {};

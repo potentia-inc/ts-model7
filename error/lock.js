@@ -18,4 +18,3 @@ export class UnlockError extends LockingError {
         super(message ?? 'Unlock Error');
     }
 }
-//# sourceMappingURL=lock.js.map

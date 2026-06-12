@@ -20,7 +20,7 @@ export const UUID_DOC_SCHEMA = {
     ...TIMESTAMP_SCHEMA,
 };
 export const OBJECTID_DOC_SCHEMA = {
-    _id: { bsonType: 'binData' },
+    _id: { bsonType: 'objectId' },
     ...TIMESTAMP_SCHEMA,
 };
 export class Model {
@@ -47,6 +47,14 @@ export function pickId(x) {
 }
 export function pickIdOrNil(x) {
     return isNullish(x) ? Nil : pickId(x);
+}
+// Strip the model-level control fields ($now/$max) so only genuine driver
+// options reach mongodb.
+function toMongoOptions(options) {
+    const rest = { ...options };
+    delete rest.$now;
+    delete rest.$max;
+    return rest;
 }
 export class Models {
     connection;
@@ -90,19 +98,21 @@ export class Models {
     }
     async find(id, options = {}) {
         const _id = pickId(id);
+        // If a model instance was passed, return it as-is without hitting the DB
+        // (it is NOT re-fetched, so it may be stale relative to the database).
         if (_id !== id)
             return id;
-        const found = await this.collection.findOne({ _id }, options);
+        const found = await this.collection.findOne({ _id }, toMongoOptions(options));
         if (isNullish(found))
             throw new NotFoundError(`Not Found: ${this.name}`);
         return this.$model(found, options);
     }
     async findOne(query = {}, options = {}) {
-        const found = await this.collection.findOne(this.$query(query, options), options);
+        const found = await this.collection.findOne(this.$query(query, options), toMongoOptions(options));
         return isNullish(found) ? Nil : this.$model(found, options);
     }
     async findMany(query = {}, pagination = {}, options = {}) {
-        return await this.iterate(query, pagination, options).toArray(options);
+        return await this.iterate(query, pagination, options).toArray();
     }
     async findManyToMapBy(by, query = {}, pagination = {}, options = {}) {
         const map = new Map();
@@ -113,7 +123,7 @@ export class Models {
     }
     iterate(query = {}, pagination = {}, options = {}) {
         const { sort, offset, limit } = this.$paginate(pagination, options);
-        const cursor = this.collection.find(this.$query(query, options), options);
+        const cursor = this.collection.find(this.$query(query, options), toMongoOptions(options));
         if (!isNullish(sort))
             cursor.sort(sort);
         cursor.skip(offset);
@@ -130,7 +140,7 @@ export class Models {
         return [{ sort: pagination.sort, offset, limit, count }, docs];
     }
     async count(query = {}, options = {}) {
-        return await this.collection.countDocuments(this.$query(query, options), options);
+        return await this.collection.countDocuments(this.$query(query, options), toMongoOptions(options));
     }
     async insertOne(values, options = {}) {
         try {
@@ -139,7 +149,7 @@ export class Models {
                 created_at: $options.$now,
                 ...this.$insert(values, $options),
             };
-            const { acknowledged } = await this.collection.insertOne(inserted, $options);
+            const { acknowledged } = await this.collection.insertOne(inserted, toMongoOptions($options));
             if (acknowledged)
                 return this.$model(inserted, $options);
         }
@@ -159,7 +169,7 @@ export class Models {
                 created_at: $options.$now,
                 ...this.$insert(x, $options),
             }));
-            const { acknowledged } = await this.collection.insertMany(inserted, $options);
+            const { acknowledged } = await this.collection.insertMany(inserted, toMongoOptions($options));
             if (acknowledged)
                 return inserted.map((x) => this.$model(x, $options));
         }
@@ -170,13 +180,13 @@ export class Models {
         }
         throw new UnacknowledgedError();
     }
-    async updateOne(id, values, options = {}) {
+    async updateOne(query, values, options = {}) {
         const $options = { ...options, $now: options.$now ?? new Date() };
-        const updated = await this.collection.findOneAndUpdate({ _id: pickId(id) }, {
+        const updated = await this.collection.findOneAndUpdate(this.$query(query, $options), {
             $inc: this.$inc(values, $options),
             $set: { updated_at: $options.$now, ...this.$set(values, $options) },
             $unset: this.$unset(values, $options),
-        }, { returnDocument: 'after', ...$options });
+        }, { returnDocument: 'after', ...toMongoOptions($options) });
         if (isNullish(updated))
             throw new NotFoundError(`Not Found: ${this.name}`);
         return this.$model(updated, $options);
@@ -187,16 +197,16 @@ export class Models {
             $inc: this.$inc(values, $options),
             $set: { updated_at: $options.$now, ...this.$set(values, $options) },
             $unset: this.$unset(values, $options),
-        }, $options);
+        }, toMongoOptions($options));
         return modifiedCount;
     }
-    async deleteOne(id, options = {}) {
-        const { deletedCount } = await this.collection.deleteOne({ _id: pickId(id) }, options);
+    async deleteOne(query, options = {}) {
+        const { deletedCount } = await this.collection.deleteOne(this.$query(query, options), toMongoOptions(options));
         if (deletedCount !== 1)
             throw new NotFoundError(`Not Found: ${this.name}`);
     }
     async deleteMany(query = {}, options = {}) {
-        const { deletedCount } = await this.collection.deleteMany(this.$query(query, options), options);
+        const { deletedCount } = await this.collection.deleteMany(this.$query(query, options), toMongoOptions(options));
         return deletedCount;
     }
 }
@@ -217,8 +227,8 @@ export class Cursor {
             await this.#cursor.close();
         }
     }
-    async toArray(options) {
-        return (await this.#cursor.toArray()).map((x) => this.#model(x, options));
+    async toArray() {
+        return (await this.#cursor.toArray()).map((x) => this.#model(x));
     }
 }
 export function getSortKey(sort) {
@@ -267,4 +277,3 @@ export function toRangeOrNil({ begin, end, } = {}, inclusiveEnd = false) {
         ? Nil
         : { $gte: begin, [inclusiveEnd ? '$lte' : '$lt']: end };
 }
-//# sourceMappingURL=model.js.map

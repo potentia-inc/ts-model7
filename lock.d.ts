@@ -1,5 +1,6 @@
 import { Filter, InsertionOf, Model, ModelOrId, Models, Options, StringDoc, UpdateFilter } from './model.js';
 import { TypeOrNil } from './type.js';
+import { Duration } from './util.js';
 export declare const LOCK_NAME = "locks";
 export type LockOrId = ModelOrId<Lock>;
 export type LockOrNil = TypeOrNil<Lock>;
@@ -78,7 +79,7 @@ export declare class Locks extends Models<LockDoc, Lock, LockQuery, LockInsert, 
     trylock(values: LockInsert, options?: Options): Promise<LockOrNil>;
     relock(lock: Lock, values: LockUpdate, options?: Options): Promise<Lock>;
     lock<T>(key: string, exec: (signal: AbortSignal) => Promise<T>, options?: {
-        ttl?: number;
+        ttl?: Duration;
         retries?: number;
         onError?: (err: Error) => void;
     }): Promise<T>;

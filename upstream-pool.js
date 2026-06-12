@@ -2,16 +2,19 @@ import assert from 'node:assert';
 import { debug } from 'node:util';
 import { NoUpstreamError } from './error/upstream.js';
 import { pickId, pickIdOrNil } from './model.js';
+import { LocalRateLimiter } from './upstream-rate-limiter.js';
 import { isNullish } from './type.js';
 import { Upstream } from './upstream.js';
-import { msleep } from './util.js';
+import { toMs } from './util.js';
 const DEBUG = debug('potentia:model:upstream');
 const DEBUG_VERBOSE = debug('potentia:model:upstream:verbose');
 export class UpstreamPool {
     #options;
+    #limiter;
     #pools = new Map();
     constructor(options) {
         this.#options = options;
+        this.#limiter = options.rateLimiter ?? new LocalRateLimiter();
     }
     async sample(type, hint) {
         const pool = await this.#pool(type);
@@ -29,6 +32,7 @@ export class UpstreamPool {
             return pool;
         const created = new Pool({
             load: () => this.#options.load(type),
+            limiter: this.#limiter,
             ...this.#options.init?.(type),
         });
         this.#pools.set(type, created);
@@ -36,17 +40,19 @@ export class UpstreamPool {
     }
 }
 class Pool {
+    // resolved internal config (ttl normalised to milliseconds)
     #options;
     #load;
+    #limiter;
     #caches = [];
     #failures = new Map();
-    #times = new Map();
     #weights = new Map();
     #expiresAt = 0;
     constructor(options) {
         this.#load = options.load;
+        this.#limiter = options.limiter;
         this.#options = {
-            ttl: options.ttl ?? 60,
+            ttl: toMs(options.ttl ?? '60s'),
             minFailures: options.minFailures ?? 0,
             minWeight: options.minWeight ?? 0.01,
             decay: options.decay ?? 0.8,
@@ -81,12 +87,9 @@ class Pool {
                     return x;
             throw new NoUpstreamError(); // should not reach here!
         })();
-        // wait a while if necessary
+        // enforce the per-upstream rate limit
         const key = this.#key(upstream);
-        const duration = this.#time(key) + upstream.interval * 1000 - Date.now();
-        if (duration > 0)
-            await msleep(duration);
-        this.#times.set(key, Date.now());
+        await this.#limiter.reserve(key, upstream.interval);
         DEBUG(`sample: ${candidates.length} ${key}`);
         return upstream;
     }
@@ -105,7 +108,7 @@ class Pool {
         const failure = this.#failure(key) + 1;
         this.#failures.set(key, failure);
         if (failure >= this.#options.minFailures) {
-            const weight = this.#weight(key, upstream.weight) * this.#options.decay;
+            const weight = Math.max(this.#options.minWeight, this.#weight(key, upstream.weight) * this.#options.decay);
             DEBUG(`fail:${key}: ${failure} ${weight}`);
             this.#weights.set(key, weight);
         }
@@ -127,19 +130,19 @@ class Pool {
         for (const x of this.#caches) {
             const key = this.#key(x);
             if (!keys.has(key)) {
-                this.#times.delete(key);
+                this.#limiter.forget?.(key);
                 this.#failures.delete(key);
+                this.#weights.delete(key);
             }
         }
         this.#caches.splice(0, this.#caches.length, ...upstreams);
-        this.#expiresAt = now + this.#options.ttl * 1000;
+        this.#expiresAt = now + this.#options.ttl;
         DEBUG(`sync: ${this.#caches.length} ${this.#expiresAt}`);
         DEBUG_VERBOSE(JSON.stringify(this.#caches.map((x) => {
             const key = this.#key(x);
             return {
                 key,
                 failure: this.#failure(key),
-                time: this.#time(key),
                 weight: this.#weight(key, x.weight),
             };
         })));
@@ -150,11 +153,7 @@ class Pool {
     #failure(key) {
         return this.#failures.get(key) ?? 0;
     }
-    #time(key) {
-        return this.#times.get(key) ?? 0;
-    }
     #weight(key, weight) {
         return this.#weights.get(key) ?? weight;
     }
 }
-//# sourceMappingURL=upstream-pool.js.map

@@ -3,7 +3,7 @@ import { getMessage } from './error.js';
 import { LockError, RelockError, UnlockError } from './error/lock.js';
 import { Model, Models, pickIdOrNil, STRING_DOC_SCHEMA, isDuplicationError, } from './model.js';
 import { Nil, isNullish } from './type.js';
-import { msleep, option } from './util.js';
+import { msleep, option, toMs } from './util.js';
 export const LOCK_NAME = 'locks';
 export class Lock extends Model {
     expiresAt;
@@ -80,7 +80,7 @@ export class Locks extends Models {
         return this.$model(relocked);
     }
     async lock(key, exec, options = {}) {
-        const ttl = (options.ttl ?? 3) * 1000; // to ms
+        const ttl = toMs(options.ttl ?? '3s'); // ms
         const retries = options.retries ?? 0; // no retry by default
         assert(ttl >= 1);
         assert(Number.isInteger(retries) && retries >= 0);
@@ -122,11 +122,10 @@ export class Locks extends Models {
             if (!isNullish(state.lock)) {
                 const lock = state.lock;
                 state.lock = Nil;
-                await this.deleteOne(lock).catch((err) => {
+                await this.deleteOne({ id: lock }).catch((err) => {
                     options.onError?.(new UnlockError(getMessage(err)));
                 });
             }
         }
     }
 }
-//# sourceMappingURL=lock.js.map

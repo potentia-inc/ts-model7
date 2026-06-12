@@ -8,4 +8,3 @@ export class NoUpstreamError extends UpstreamError {
         super(message ?? 'No Upstream');
     }
 }
-//# sourceMappingURL=upstream.js.map

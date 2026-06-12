@@ -124,16 +124,16 @@ export declare abstract class Models<D extends Doc<unknown>, M extends Model<D>,
     count(query?: Q, options?: Options): Promise<number>;
     insertOne(values: I, options?: Options): Promise<M>;
     insertMany(values: I[], options?: Options): Promise<M[]>;
-    updateOne(id: ModelOrId<M>, values: U, options?: Options): Promise<M>;
+    updateOne(query: Q, values: U, options?: Options): Promise<M>;
     updateMany(query: Q, values: U, options?: Options): Promise<number>;
-    deleteOne(id: ModelOrId<M>, options?: Options): Promise<void>;
+    deleteOne(query: Q, options?: Options): Promise<void>;
     deleteMany(query?: Q, options?: Options): Promise<number>;
 }
 export declare class Cursor<D extends Doc<unknown>, M extends Model<D>> {
     #private;
-    constructor(model: (d: D | WithId<D>, options?: Options) => M, cursor: ExplainableCursor<D>);
+    constructor(model: (d: D | WithId<D>) => M, cursor: ExplainableCursor<D>);
     [Symbol.asyncIterator](): AsyncGenerator<M, void, unknown>;
-    toArray(options?: Options): Promise<M[]>;
+    toArray(): Promise<M[]>;
 }
 export type Pagination<S> = {
     sort?: S;

@@ -1,6 +1,8 @@
+import { RateLimiter } from './upstream-rate-limiter.js';
 import { Upstream, UpstreamOrId } from './upstream.js';
+import { Duration } from './util.js';
 export type UpstreamPoolInit = {
-    ttl: number;
+    ttl: Duration;
     minFailures: number;
     minWeight: number;
     decay: number;
@@ -8,6 +10,7 @@ export type UpstreamPoolInit = {
 export type UpstreamPoolOptions = {
     load: (type: Upstream['type']) => Promise<Upstream[]>;
     init?: (type: Upstream['type']) => Partial<UpstreamPoolInit>;
+    rateLimiter?: RateLimiter;
 };
 type Hint = {
     type: 'same' | 'diff';
