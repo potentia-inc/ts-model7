@@ -1,30 +1,219 @@
 # @potentia/model7
 
-Model utility based on
+A small, typed MongoDB modeling layer built on
 [@potentia/util](https://github.com/potentia-inc/ts-util) and
-[@potentia/mongodb7](https://github.com/potentia-inc/ts-mongodb7)
+[@potentia/mongodb7](https://github.com/potentia-inc/ts-mongodb7). It maps
+snake_case Mongo documents to camelCase model instances and adds typed CRUD,
+pagination, distributed locks and weighted upstream selection.
+
+- [connection](#connection): create the `Connection` your models share
+- [model](#model): the `Model`/`Models` base classes — typed CRUD, queries and
+  pagination over a collection
+- [lock](#lock): distributed, auto-extending locks (`Locks`)
+- [upstream](#upstream): the `Upstream` model — a request target with headers,
+  query and a rate-limit interval
+- [upstream pool](#upstreampool): weighted upstream selection with failure decay
+- [rate limiting](#rate-limiting): a pluggable `RateLimiter` (in-process, or a
+  shared store)
+
+Re-export entry points: `@potentia/model7/mongo` (`Connection` + the `mongodb`
+types), `@potentia/model7/type` (`Uuid`, `ObjectId`, `Nil`, coercions),
+`@potentia/model7/util` (`Duration`, `sleep`, …) and `@potentia/model7/error`
+(`NotFoundError`, `ConflictError`, …).
 
 ## Runtime support
 
 Works on **Node.js (>= 22)**, **Bun** and **Deno (>= 2)**. The published package
-ships compiled JavaScript plus type declarations and depends only on
-[@potentia/util](https://github.com/potentia-inc/ts-util),
-[@potentia/mongodb7](https://github.com/potentia-inc/ts-mongodb7) and the
-`mongodb` driver (all peer dependencies), each of which runs on the three
-runtimes. A framework-free `smoke.mjs` exercises a live-MongoDB round trip on
-Node, Bun and Deno; the `node:test` suites run on Node and Deno (Bun cannot run
-`node:test` yet — [oven-sh/bun#5090](https://github.com/oven-sh/bun/issues/5090)).
+ships compiled JavaScript plus type declarations. `@potentia/util` and
+`@potentia/mongodb7` are bundled as **dependencies**; the `mongodb` driver is a
+**peer dependency** you provide, so its BSON types (`UUID`, `ObjectId`) keep a
+single identity across your app. A framework-free `smoke.mjs` exercises a
+live-MongoDB round trip on Node, Bun and Deno; the `node:test` suites run on Node
+and Deno (Bun cannot run `node:test` yet —
+[oven-sh/bun#5090](https://github.com/oven-sh/bun/issues/5090)).
 
 ```sh
 npm install @potentia/model7 mongodb   # or: bun add / deno add
 ```
 
+## Connection
+
+Everything takes a `Connection` (re-exported from `@potentia/mongodb7`). Create
+one, connect, run `migrate()` to create each collection with its validator and
+indexes, and pass it to your models:
+
+```typescript
+import { Connection } from '@potentia/model7/mongo'
+import { FOO_SCHEMA, Foos } from './foo.js'
+
+const connection = new Connection(process.env.MONGO_URI)
+await connection.connect()
+await connection.migrate(FOO_SCHEMA) // create/upgrade the collection + indexes
+
+const foos = new Foos({ connection })
+// ... use the model ...
+
+await connection.disconnect()
+```
+
 ## Model
 
-Refer to the tests for additional details.
+`Models<D, M, Q, I, U, S>` is the base class for a collection. It maps a
+snake_case document `D` to a camelCase model `M`, parameterised by the shapes of
+a query `Q`, an insert `I`, an update `U` and a sort `S`. You subclass it and
+implement a few small hooks that translate those shapes into Mongo
+filters/updates; `created_at`/`updated_at` are managed for you.
 
-  - `test/foo.ts`: example for a UUID-key model
-  - `test/bar.ts`: example for a composite-key model
+```typescript
+import {
+  Filter,
+  InsertionOf,
+  Model,
+  ModelOrId,
+  Models,
+  UUID_DOC_SCHEMA,
+  UpdateFilter,
+  UuidDoc,
+  pickIdOrNil,
+  toRangeOrNil,
+  toUnsetOrNil,
+} from '@potentia/model7'
+import { Uuid } from '@potentia/model7/type'
+import { option } from '@potentia/model7/util'
+
+// 1. the document (at rest, snake_case) and the model (camelCase)
+type FooDoc = UuidDoc & { foo: string; bar?: number }
+
+class Foo extends Model<FooDoc> {
+  foo: string
+  bar?: number
+  constructor(doc: FooDoc) {
+    super(doc) // sets id, createdAt, updatedAt
+    this.foo = doc.foo
+    this.bar = doc.bar
+  }
+}
+
+// 2. the collection schema (name + JSON-schema validator + indexes)
+export const FOO_SCHEMA = {
+  name: 'foos',
+  validator: {
+    $jsonSchema: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['_id', 'foo', 'created_at'],
+      properties: {
+        ...UUID_DOC_SCHEMA,
+        foo: { type: 'string' },
+        bar: { type: 'number' },
+      },
+    },
+  },
+  indexes: { foo_unique: { keys: { foo: 1 }, options: { unique: true } } },
+}
+
+// 3. the API shapes (query / insert / update / sort)
+type FooQuery = {
+  id?: ModelOrId<Foo>
+  foo?: string
+  createdIn?: { begin?: Date; end?: Date }
+}
+type FooInsert = { id?: Uuid; foo: string; bar?: number }
+type FooUpdate = { foo?: string; bar?: number }
+type FooSort = { createdAt?: 'asc' | 'desc' }
+
+// 4. the collection — implement the hooks
+export class Foos extends Models<
+  FooDoc,
+  Foo,
+  FooQuery,
+  FooInsert,
+  FooUpdate,
+  FooSort
+> {
+  get name() {
+    return 'foos'
+  }
+  $model(doc: FooDoc) {
+    return new Foo(doc)
+  }
+  $insert(values: FooInsert): InsertionOf<FooDoc> {
+    return { _id: values.id ?? new Uuid(), foo: values.foo, bar: values.bar }
+  }
+  $query(query: FooQuery): Filter<FooDoc> {
+    return {
+      _id: pickIdOrNil(query.id),
+      foo: query.foo,
+      created_at: toRangeOrNil(query.createdIn),
+    }
+  }
+  $set(values: FooUpdate): UpdateFilter<FooDoc> {
+    return { foo: values.foo, bar: values.bar }
+  }
+  $unset(values: FooUpdate): UpdateFilter<FooDoc> {
+    return { bar: toUnsetOrNil(values, 'bar') }
+  }
+  $sort(sort: FooSort) {
+    return { ...option('created_at', sort.createdAt) }
+  }
+}
+```
+
+`test/foo.ts` (UUID key) and `test/bar.ts` (composite key) are complete, runnable
+versions.
+
+### Hooks
+
+Only `name`, `$model` and `$insert` are required; the rest default to an empty
+filter/update (so an un-overridden model matches everything and an update only
+bumps `updated_at`). Because the collection runs with `ignoreUndefined`, any
+`undefined` field a hook returns is simply omitted.
+
+| hook                          | maps to                                       |
+| ----------------------------- | --------------------------------------------- |
+| `get name`                    | the collection name                           |
+| `$model(doc)`                 | a model instance from a document              |
+| `$insert(values)`             | a document to insert (without `created_at`)   |
+| `$query(query)`               | a Mongo `Filter`                              |
+| `$set` / `$unset` / `$inc`    | the `$set` / `$unset` / `$inc` of an update   |
+| `$sort(sort)`                 | a Mongo `Sort`                                |
+
+### API
+
+```typescript
+await foos.insertOne({ foo: 'a' }) // -> Foo (ConflictError on a duplicate key)
+await foos.insertMany([{ foo: 'b' }]) // -> Foo[]
+
+await foos.find(id) // by primary key; throws NotFoundError
+await foos.findOne({ foo: 'a' }) // the first match, or Nil
+await foos.findMany({}, { sort: { createdAt: 'asc' }, offset: 0, limit: 100 })
+await foos.count({ foo: 'a' })
+await foos.paginate(query, pagination) // -> [pagination & { count }, Foo[]]
+for await (const foo of foos.iterate(query, pagination)) {
+  // stream large result sets
+}
+await foos.findManyToMapBy((x) => String(x.id), query) // -> Map<string, Foo>
+
+await foos.updateOne({ id }, { bar: 1 }) // the first match; throws NotFoundError
+await foos.updateMany({ foo: 'a' }, { bar: 1 }) // -> modified count
+await foos.deleteOne({ id }) // throws NotFoundError if nothing was deleted
+await foos.deleteMany({ foo: 'a' }) // -> deleted count
+```
+
+`updateOne`/`deleteOne` take a **query** — the singular form of
+`updateMany`/`deleteMany`; target a single document by primary key with `{ id }`.
+Pagination is `{ sort?, offset, limit }` plus a returned `count`; cap `limit` per
+call with the `$max` option. Errors (`NotFoundError`, `ConflictError`,
+`UnacknowledgedError`) come from `@potentia/model7/error`.
+
+### Helpers
+
+For building hook results: `pickId`/`pickIdOrNil` (a model-or-id to its id),
+`toRangeOrNil` (`{ begin, end }` → `{ $gte, $lt }`), `toValueOrInOrNil` (a value
+or array → the value or `{ $in }`), `toValueOrAbsent`/`toValueOrAbsentOrNil` (a
+value or `{ $exists: false }`), `toExistsOrNil`, `toUnsetOrNil`, `getSortKey` and
+`option`. Document/schema building blocks: `Timestamp` + `TIMESTAMP_SCHEMA`, and
+`UuidDoc`/`StringDoc`/`NumberDoc`/`ObjectIdDoc` with matching `*_DOC_SCHEMA`.
 
 ## Lock
 
