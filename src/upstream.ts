@@ -12,7 +12,7 @@ import {
   toUnsetOrNil,
 } from './model.js'
 import { Nil, TypeOrNil, Uuid, isNullish } from './type.js'
-import { option } from './util.js'
+import { Duration, option, toMs } from './util.js'
 
 export const UPSTREAM_NAME = 'upstreams'
 
@@ -26,7 +26,7 @@ export type UpstreamDoc = UuidDoc & {
   headers?: Record<string, string>
   searchs?: Record<string, string>
   auth?: Record<string, string>
-  interval?: number
+  interval?: number // seconds at rest (language-neutral DB convention)
   weight?: number
 }
 
@@ -42,7 +42,7 @@ export class Upstream extends Model<UpstreamDoc> {
   headers: Record<string, string>
   searchs: Record<string, string>
   auth: Record<string, string>
-  interval: number
+  interval: number // milliseconds (code convention)
   weight: number
 
   url(options: UpstreamOptions = {}): URL {
@@ -74,7 +74,7 @@ export class Upstream extends Model<UpstreamDoc> {
     this.headers = doc.headers ?? {}
     this.searchs = doc.searchs ?? {}
     this.auth = doc.auth ?? {}
-    this.interval = doc.interval ?? 0.001
+    this.interval = (doc.interval ?? 0.001) * 1000 // seconds -> ms
     this.weight = doc.weight ?? 0
   }
 }
@@ -123,7 +123,7 @@ export type UpstreamInsert = {
   headers?: Record<string, string>
   searchs?: Record<string, string>
   auth?: Record<string, string>
-  interval?: number
+  interval?: Duration
   weight?: number
 }
 export type UpstreamUpdate = {
@@ -133,7 +133,7 @@ export type UpstreamUpdate = {
   headers?: Record<string, string>
   searchs?: Record<string, string>
   auth?: Record<string, string>
-  interval?: number
+  interval?: Duration
   weight?: number
 }
 
@@ -177,19 +177,17 @@ export class Upstreams extends Models<
   }
 
   $insert(values: UpstreamInsert): InsertionOf<UpstreamDoc> {
-    const { type, host, path, headers, searchs, auth, interval, weight } =
-      values
-    assertInterval(interval)
+    const { type, host, path, headers, searchs, auth, weight } = values
     assertWeight(weight)
     const _id = values.id ?? new Uuid()
+    const interval = toIntervalSeconds(values.interval)
     return { _id, type, host, path, headers, searchs, auth, interval, weight }
   }
 
   $set(values: UpstreamUpdate): UpdateFilter<UpstreamDoc> {
-    const { type, host, path, headers, searchs, auth, interval, weight } =
-      values
-    assertInterval(interval)
+    const { type, host, path, headers, searchs, auth, weight } = values
     assertWeight(weight)
+    const interval = toIntervalSeconds(values.interval)
     return { type, host, path, headers, searchs, auth, interval, weight }
   }
 
@@ -205,8 +203,13 @@ export class Upstreams extends Models<
   }
 }
 
-function assertInterval(x?: number) {
-  if (!isNullish(x)) assert(x >= 0.001)
+// Accept a Duration (code convention: a number is ms) and normalise to the
+// seconds the DB stores (language-neutral). Nil passes through untouched.
+function toIntervalSeconds(x?: Duration): number | undefined {
+  if (isNullish(x)) return Nil
+  const ms = toMs(x)
+  assert(ms >= 1) // at least 1ms
+  return ms / 1000
 }
 
 function assertWeight(x?: number) {

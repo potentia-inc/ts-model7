@@ -5,12 +5,13 @@ import { pickId, pickIdOrNil } from './model.js'
 import { LocalRateLimiter, RateLimiter } from './upstream-rate-limiter.js'
 import { isNullish } from './type.js'
 import { Upstream, UpstreamOrId } from './upstream.js'
+import { Duration, toMs } from './util.js'
 
 const DEBUG = debug('potentia:model:upstream')
 const DEBUG_VERBOSE = debug('potentia:model:upstream:verbose')
 
 export type UpstreamPoolInit = {
-  ttl: number
+  ttl: Duration // cache TTL (a number is milliseconds)
   minFailures: number
   minWeight: number
   decay: number
@@ -68,7 +69,13 @@ export class UpstreamPool {
 }
 
 class Pool {
-  #options: UpstreamPoolInit
+  // resolved internal config (ttl normalised to milliseconds)
+  #options: {
+    ttl: number
+    minFailures: number
+    minWeight: number
+    decay: number
+  }
   #load: () => Promise<Upstream[]>
   #limiter: RateLimiter
 
@@ -86,7 +93,7 @@ class Pool {
     this.#load = options.load
     this.#limiter = options.limiter
     this.#options = {
-      ttl: options.ttl ?? 60,
+      ttl: toMs(options.ttl ?? '60s'),
       minFailures: options.minFailures ?? 0,
       minWeight: options.minWeight ?? 0.01,
       decay: options.decay ?? 0.8,
@@ -129,7 +136,7 @@ class Pool {
 
     // enforce the per-upstream rate limit
     const key = this.#key(upstream)
-    await this.#limiter.reserve(key, upstream.interval * 1000)
+    await this.#limiter.reserve(key, upstream.interval)
     DEBUG(`sample: ${candidates.length} ${key}`)
     return upstream
   }
@@ -184,7 +191,7 @@ class Pool {
       }
     }
     this.#caches.splice(0, this.#caches.length, ...upstreams)
-    this.#expiresAt = now + this.#options.ttl * 1000
+    this.#expiresAt = now + this.#options.ttl
     DEBUG(`sync: ${this.#caches.length} ${this.#expiresAt}`)
     DEBUG_VERBOSE(
       JSON.stringify(

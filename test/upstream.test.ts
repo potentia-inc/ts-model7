@@ -103,7 +103,7 @@ describe('upstream-pool', () => {
   test('sync', async () => {
     const pool = new UpstreamPool({
       load: (type) => UPSTREAMS.findMany({ type, gtWeight: 0 }),
-      init: () => ({ ttl: 3 }),
+      init: () => ({ ttl: '3s' }),
     })
 
     const type = randStr()
@@ -123,7 +123,7 @@ describe('upstream-pool', () => {
   test('NoUpstreamError', async () => {
     const pool = new UpstreamPool({
       load: (type) => UPSTREAMS.findMany({ type, gtWeight: 0 }),
-      init: () => ({ ttl: 3 }),
+      init: () => ({ ttl: '3s' }),
     })
 
     const type = randStr()
@@ -134,7 +134,7 @@ describe('upstream-pool', () => {
   test('same', async () => {
     const pool = new UpstreamPool({
       load: (type) => UPSTREAMS.findMany({ type, gtWeight: 0 }),
-      init: () => ({ ttl: 10 }),
+      init: () => ({ ttl: '10s' }),
     })
 
     const type = randStr()
@@ -150,7 +150,7 @@ describe('upstream-pool', () => {
   test('same but get different upstream', async () => {
     const pool = new UpstreamPool({
       load: (type) => UPSTREAMS.findMany({ type, gtWeight: 0 }),
-      init: () => ({ ttl: 10 }),
+      init: () => ({ ttl: '10s' }),
     })
 
     const type = randStr()
@@ -166,7 +166,7 @@ describe('upstream-pool', () => {
   test('diff', async () => {
     const pool = new UpstreamPool({
       load: (type) => UPSTREAMS.findMany({ type, gtWeight: 0 }),
-      init: () => ({ ttl: 10 }),
+      init: () => ({ ttl: '10s' }),
     })
 
     const type = randStr()
@@ -182,7 +182,7 @@ describe('upstream-pool', () => {
   test('diff but get same upstream', async () => {
     const pool = new UpstreamPool({
       load: (type) => UPSTREAMS.findMany({ type, gtWeight: 0 }),
-      init: () => ({ ttl: 10 }),
+      init: () => ({ ttl: '10s' }),
     })
 
     const type = randStr()
@@ -198,7 +198,7 @@ describe('upstream-pool', () => {
   test('weight decay', async () => {
     const pool = new UpstreamPool({
       load: (type) => UPSTREAMS.findMany({ type, gtWeight: 0 }),
-      init: () => ({ ttl: 10, minFailures: 2, decay: 0.5 }),
+      init: () => ({ ttl: '10s', minFailures: 2, decay: 0.5 }),
     })
 
     const type = randStr()

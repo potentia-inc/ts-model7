@@ -12,6 +12,14 @@ describe('LocalRateLimiter', () => {
     assert.ok(Date.now() - started >= 3 * interval - 10)
   })
 
+  test('accepts a Duration string interval', async () => {
+    const limiter = new LocalRateLimiter()
+    const started = Date.now()
+    await limiter.reserve('a', '50ms') // immediate
+    await limiter.reserve('a', '50ms') // waits ~50ms
+    assert.ok(Date.now() - started >= 40)
+  })
+
   test('keys are independent', async () => {
     const limiter = new LocalRateLimiter()
     const started = Date.now()

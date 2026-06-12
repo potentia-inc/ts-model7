@@ -52,9 +52,10 @@ await locks.lock(
   {
     // All the following options are optional
 
-    // The lock will be active for `ttl` seconds and will automatically extend
-    // approximately every `ttl / 2` seconds. The default is `3` seconds.
-    ttl: 3,
+    // The lock stays active for `ttl` and auto-extends about every `ttl / 2`.
+    // `ttl` is a Duration: a number is milliseconds, or a string like '3s' /
+    // '500ms'. The default is '3s'.
+    ttl: '3s',
 
     // Retry up to `retries` times if the lock extension fails.
     // The default is `0` (no retry).
@@ -95,8 +96,10 @@ const upstream = await upstreams.insertOne({
   headers: { ... },
   searchs: { a: 'foo', b: 'bar' },
 
-  // The minimum interval (in seconds) between consecutive requests. Default: 0.001.
-  interval: 0.2,
+  // The minimum spacing between consecutive requests, as a Duration (a number
+  // is milliseconds, or a string like '200ms' / '0.2s'). Stored as seconds in
+  // the DB but read back as milliseconds on `upstream.interval`. Default: '1ms'.
+  interval: '200ms',
 
   // The weight of this upstream. Set to a positive number to enable it. Default: 0.
   weight: 0.5,
@@ -129,9 +132,9 @@ const pool = new UpstreamPool({
 
     // or set pool parameters for all types
     return {
-      // TTL (in seconds) for the upstream cache.
-      // Default: 60 (load upstreams every 60 seconds).
-      ttl: 60,
+      // TTL for the upstream cache, as a Duration (a number is milliseconds,
+      // or a string like '60s'). Default: '60s'.
+      ttl: '60s',
 
       /*
       Weight decay logic:
@@ -173,14 +176,17 @@ pool.fail(upstream)
 
 ## Rate limiting
 
-Each upstream has an `interval` (seconds) — the minimum spacing between
-consecutive requests to it. `UpstreamPool` enforces this through a pluggable
-`RateLimiter`:
+Each upstream has an `interval` — the minimum spacing between consecutive
+requests to it. `UpstreamPool` enforces this through a pluggable `RateLimiter`,
+whose `interval` is a [Duration](https://github.com/potentia-inc/ts-util) (a
+number is milliseconds):
 
 ```typescript
+import { Duration } from '@potentia/util'
+
 interface RateLimiter {
-  // Block until a request for `key` may proceed, enforcing >= intervalMs spacing.
-  reserve(key: string, intervalMs: number): Promise<void>
+  // Block until a request for `key` may proceed, enforcing >= `interval` spacing.
+  reserve(key: string, interval: Duration): Promise<void>
   // Optional: drop any state held for a removed upstream.
   forget?(key: string): void
 }
@@ -230,7 +236,7 @@ TTL index:
 ```typescript
 import { Connection } from '@potentia/model7/mongo'
 import { RateLimiter } from '@potentia/model7/upstream/rate-limiter'
-import { msleep } from '@potentia/model7/util'
+import { Duration, msleep, toMs } from '@potentia/model7/util'
 
 // db.upstream_rate.createIndex({ next_at: 1 }, { expireAfterSeconds: 86400 })
 
@@ -243,7 +249,8 @@ class MongoRateLimiter implements RateLimiter {
     private name = 'upstream_rate',
   ) {}
 
-  async reserve(key: string, intervalMs: number): Promise<void> {
+  async reserve(key: string, interval: Duration): Promise<void> {
+    const intervalMs = toMs(interval)
     let credit = this.#credits.get(key)
     if (credit === undefined || credit.left <= 0) {
       const span = intervalMs * this.lease
@@ -295,7 +302,7 @@ script advances the per-key "next allowed" time and returns how long to wait:
 ```typescript
 import { createClient } from 'redis'
 import { RateLimiter } from '@potentia/model7/upstream/rate-limiter'
-import { msleep } from '@potentia/model7/util'
+import { Duration, msleep, toMs } from '@potentia/model7/util'
 
 // KEYS[1]=key, ARGV[1]=intervalMs, ARGV[2]=now(ms) -> ms to wait
 const SCRIPT = `
@@ -309,10 +316,10 @@ const SCRIPT = `
 class RedisRateLimiter implements RateLimiter {
   constructor(private redis: ReturnType<typeof createClient>) {}
 
-  async reserve(key: string, intervalMs: number): Promise<void> {
+  async reserve(key: string, interval: Duration): Promise<void> {
     const wait = (await this.redis.eval(SCRIPT, {
       keys: [`rate:${key}`],
-      arguments: [String(intervalMs), String(Date.now())],
+      arguments: [String(toMs(interval)), String(Date.now())],
     })) as number
     if (wait > 0) await msleep(wait)
   }

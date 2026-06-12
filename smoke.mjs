@@ -52,7 +52,7 @@ if (MONGO_URI) {
     // Locks: a full lock() round trip with a unique key
     const locks = new Locks({ connection })
     const key = `smoke_${runtime}_${randomUUID()}`
-    assert.equal(await locks.lock(key, async () => 42, { ttl: 3 }), 42)
+    assert.equal(await locks.lock(key, async () => 42, { ttl: '3s' }), 42)
     assert.equal(await locks.findOne({ id: key }), undefined) // released
 
     // Upstreams: insert + url/link + find, then sample through a pool

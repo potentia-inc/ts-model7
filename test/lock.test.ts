@@ -33,7 +33,7 @@ describe('lock', () => {
         await sleep(10000)
         return true
       },
-      { ttl: 3 },
+      { ttl: '3s' },
     )
     await setImmediate()
 
@@ -112,7 +112,7 @@ describe('lock', () => {
           }
           return true
         },
-        { ttl: 2, retries: 1, onError },
+        { ttl: '2s', retries: 1, onError },
       ),
       false,
     )
@@ -140,7 +140,7 @@ describe('lock', () => {
           await sleep(3000)
           return !signal.aborted
         },
-        { ttl: 4, onError },
+        { ttl: '4s', onError },
       ),
       true,
     )

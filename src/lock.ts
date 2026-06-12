@@ -15,7 +15,7 @@ import {
   isDuplicationError,
 } from './model.js'
 import { Nil, TypeOrNil, isNullish } from './type.js'
-import { msleep, option } from './util.js'
+import { Duration, msleep, option, toMs } from './util.js'
 
 export const LOCK_NAME = 'locks'
 export type LockOrId = ModelOrId<Lock>
@@ -148,12 +148,12 @@ export class Locks extends Models<
     key: string,
     exec: (signal: AbortSignal) => Promise<T>,
     options: {
-      ttl?: number // in second
+      ttl?: Duration
       retries?: number
       onError?: (err: Error) => void
     } = {},
   ): Promise<T> {
-    const ttl = (options.ttl ?? 3) * 1000 // to ms
+    const ttl = toMs(options.ttl ?? '3s') // ms
     const retries = options.retries ?? 0 // no retry by default
     assert(ttl >= 1)
     assert(Number.isInteger(retries) && retries >= 0)

@@ -1,20 +1,20 @@
 import assert from 'node:assert'
-import { msleep } from './util.js'
+import { Duration, msleep, toMs } from './util.js'
 
 export interface RateLimiter {
-  // Block until a request for `key` may proceed, enforcing at least intervalMs
+  // Block until a request for `key` may proceed, enforcing at least `interval`
   // of spacing between consecutive requests for that key. The slot is reserved
   // synchronously (before awaiting), so concurrent calls queue correctly.
-  reserve(key: string, intervalMs: number): Promise<void>
+  reserve(key: string, interval: Duration): Promise<void>
   // Optional: drop any state held for `key` (e.g. an upstream that's gone).
   forget?(key: string): void
 }
 
-// In-process rate limiter: spaces requests for each key at `intervalMs`.
+// In-process rate limiter: spaces requests for each key at `interval`.
 //
 // For a fixed multi-worker fleet, set `workers` to the number of pool instances
 // that share each upstream's budget. Every worker then spaces locally at
-// `intervalMs * workers`, so the aggregate across the fleet stays within the
+// `interval * workers`, so the aggregate across the fleet stays within the
 // global limit -- with no shared state (no DB round-trip).
 //
 // This is a ceiling, not a scheduler: under-counting `workers` breaks the global
@@ -32,7 +32,7 @@ export class LocalRateLimiter implements RateLimiter {
 
   // The number of pool instances sharing each upstream's budget. Adjust it as
   // the fleet scales: the new value applies to subsequent reserve() calls, so
-  // the per-worker spacing (intervalMs * workers) tracks the current count. When
+  // the per-worker spacing (interval * workers) tracks the current count. When
   // scaling down, lower it only once the workers have actually stopped -- an
   // over-count under-utilizes (safe), an under-count can breach the limit.
   get workers(): number {
@@ -44,8 +44,8 @@ export class LocalRateLimiter implements RateLimiter {
     this.#workers = workers
   }
 
-  async reserve(key: string, intervalMs: number): Promise<void> {
-    const spacing = intervalMs * this.#workers
+  async reserve(key: string, interval: Duration): Promise<void> {
+    const spacing = toMs(interval) * this.#workers
     const now = Date.now()
     const at = Math.max(now, this.#next.get(key) ?? 0)
     this.#next.set(key, at + spacing)
