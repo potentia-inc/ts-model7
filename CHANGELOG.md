@@ -1,5 +1,11 @@
 # Change log
 
+## [2.1.0] - 2026-06-17
+
+Upgrade @potentia/util to 4.3.0
+- toBigInt/toNumber accept numeric wrapper objects and integral decimal
+  strings; empty-string/array inputs now throw.
+
 ## [2.0.0] - 2026-06-12
 
 Cross-runtime release (Node.js >= 22, Bun, Deno >= 2), upgraded to

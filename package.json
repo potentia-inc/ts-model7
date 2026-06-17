@@ -1,6 +1,6 @@
 {
   "name": "@potentia/model7",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "cross-runtime model utilities for mongodb^7.0.0 on node.js, bun and deno",
   "type": "module",
   "main": "./model.js",
@@ -32,12 +32,12 @@
     "globals": "^17.0.0",
     "prettier": "^3.0.0",
     "rimraf": "^6.0.0",
-    "typescript": "^5.0.0",
+    "typescript": "^6.0.0",
     "typescript-eslint": "^8.0.0"
   },
   "dependencies": {
     "@potentia/mongodb7": "github:potentia-inc/ts-mongodb7#2.0.0",
-    "@potentia/util": "github:potentia-inc/ts-util#4.2.0"
+    "@potentia/util": "github:potentia-inc/ts-util#4.3.0"
   },
   "peerDependencies": {
     "mongodb": "^7.0.0"
