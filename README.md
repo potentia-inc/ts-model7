@@ -36,6 +36,20 @@ and Deno (Bun cannot run `node:test` yet —
 npm install @potentia/model7 mongodb   # or: bun add / deno add
 ```
 
+### Bun and bson
+
+`bson` >= 7.3.0 crashes on import **under Bun**: its `ObjectId` calls
+`v8.startupSnapshot.isBuildingSnapshot()`, which Bun ships as a stub that throws
+`NotImplementedError` instead of returning `false`. Node.js and Deno are
+unaffected. If you run model7 under Bun, pin `bson` below 7.3.0 in your own
+`package.json` (Bun honors the `overrides` field) until Bun implements it:
+
+```json
+"overrides": { "bson": "~7.2.0" }
+```
+
+This is a Bun limitation, not a model7 bug.
+
 ## Connection
 
 Everything takes a `Connection` (re-exported from `@potentia/mongodb7`). Create

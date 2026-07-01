@@ -122,10 +122,13 @@ describe('lock', () => {
 
   test('UnlockError', async () => {
     const id = randStr()
+    // Delete the lock out from under the holder after its last relock (at
+    // ttl/2 = 2s) but before it finishes exec (3s) and unlocks, so the holder's
+    // own deleteOne in finally finds nothing and reports an UnlockError.
     const timeout = new Promise((resolve, reject) =>
       setTimeout(
         () => LOCKS.deleteOne({ id }).then(resolve).catch(reject),
-        3500,
+        2500,
       ),
     )
     let called = 0
