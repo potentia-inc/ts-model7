@@ -1,6 +1,7 @@
-import { RateLimiter } from './upstream-rate-limiter.js';
-import { Upstream, UpstreamOrId } from './upstream.js';
-import { Duration } from './util.js';
+import type { RateLimiter } from './upstream-rate-limiter.js';
+import type { UpstreamOrId } from './upstream.js';
+import { Upstream } from './upstream.js';
+import type { Duration } from './util.js';
 export type UpstreamPoolInit = {
     ttl: Duration;
     minFailures: number;

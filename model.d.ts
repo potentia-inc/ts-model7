@@ -1,6 +1,8 @@
-import { Collection, CommandOperationOptions, Connection, ExplainableCursor, Filter, OptionalUnlessRequiredId, Sort, UpdateFilter, WithId } from './mongo.js';
-import { ObjectId, Uuid, Nil, TypeOrNil } from './type.js';
-export { Filter, WithId, UpdateFilter, isDuplicationError } from './mongo.js';
+import type { Collection, CommandOperationOptions, Connection, ExplainableCursor, Filter, OptionalUnlessRequiredId, Sort, UpdateFilter, WithId } from './mongo.js';
+import type { ObjectId, Uuid, TypeOrNil } from './type.js';
+import { Nil } from './type.js';
+export { isDuplicationError } from './mongo.js';
+export type { Filter, WithId, UpdateFilter } from './mongo.js';
 export type Timestamp = {
     created_at: Date;
     updated_at?: Date;

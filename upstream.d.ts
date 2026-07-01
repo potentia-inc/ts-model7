@@ -1,6 +1,7 @@
-import { Filter, InsertionOf, Model, ModelOrId, Models, UpdateFilter, UuidDoc } from './model.js';
-import { TypeOrNil } from './type.js';
-import { Duration } from './util.js';
+import type { Filter, InsertionOf, ModelOrId, UpdateFilter, UuidDoc } from './model.js';
+import { Model, Models } from './model.js';
+import type { TypeOrNil } from './type.js';
+import type { Duration } from './util.js';
 export declare const UPSTREAM_NAME = "upstreams";
 export type UpstreamOrId = ModelOrId<Upstream>;
 export type UpstreamOrNil = TypeOrNil<Upstream>;

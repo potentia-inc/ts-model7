@@ -1,4 +1,4 @@
-import { Duration } from './util.js';
+import type { Duration } from './util.js';
 export interface RateLimiter {
     reserve(key: string, interval: Duration): Promise<void>;
     forget?(key: string): void;

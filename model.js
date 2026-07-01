@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { ConflictError, NotFoundError, UnacknowledgedError } from './error.js';
-import { isDuplicationError, } from './mongo.js';
+import { isDuplicationError } from './mongo.js';
 import { Nil, isNullish } from './type.js';
 export { isDuplicationError } from './mongo.js';
 export const TIMESTAMP_SCHEMA = {

@@ -1,6 +1,7 @@
-import { Filter, InsertionOf, Model, ModelOrId, Models, Options, StringDoc, UpdateFilter } from './model.js';
-import { TypeOrNil } from './type.js';
-import { Duration } from './util.js';
+import type { Filter, InsertionOf, ModelOrId, Options, StringDoc, UpdateFilter } from './model.js';
+import { Model, Models } from './model.js';
+import type { TypeOrNil } from './type.js';
+import type { Duration } from './util.js';
 export declare const LOCK_NAME = "locks";
 export type LockOrId = ModelOrId<Lock>;
 export type LockOrNil = TypeOrNil<Lock>;
