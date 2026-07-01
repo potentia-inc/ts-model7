@@ -1,5 +1,11 @@
 # Change log
 
+## [2.1.2] - 2026-07-01
+
+Track the latest releases of both dependencies; no API or runtime changes.
+
+- Upgrade `@potentia/util` to 4.3.1 and `@potentia/mongodb7` to 2.0.1.
+
 ## [2.1.1] - 2026-07-01
 
 ### Fixed
