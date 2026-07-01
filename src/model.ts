@@ -1,20 +1,22 @@
 import assert from 'node:assert'
 import { ConflictError, NotFoundError, UnacknowledgedError } from './error.js'
-import {
+import type {
   Collection,
   CommandOperationOptions,
   Connection,
   ExplainableCursor,
   Filter,
-  isDuplicationError,
   OptionalUnlessRequiredId,
   Sort,
   UpdateFilter,
   WithId,
 } from './mongo.js'
-import { ObjectId, Uuid, Nil, TypeOrNil, isNullish } from './type.js'
+import { isDuplicationError } from './mongo.js'
+import type { ObjectId, Uuid, TypeOrNil } from './type.js'
+import { Nil, isNullish } from './type.js'
 
-export { Filter, WithId, UpdateFilter, isDuplicationError } from './mongo.js'
+export { isDuplicationError } from './mongo.js'
+export type { Filter, WithId, UpdateFilter } from './mongo.js'
 
 export type Timestamp = {
   created_at: Date

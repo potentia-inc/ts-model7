@@ -2,10 +2,10 @@ import { strict as assert } from 'node:assert'
 import { randomBytes } from 'node:crypto'
 import { after, before, describe, test } from 'node:test'
 import { ConflictError, NotFoundError } from '../src/error.js'
+import type { StringDoc } from '../src/model.js'
 import {
   Model,
   Models,
-  StringDoc,
   getSortKey,
   toExistsOrNil,
   toUnsetOrNil,

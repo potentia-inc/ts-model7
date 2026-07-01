@@ -2,10 +2,13 @@ import assert from 'node:assert'
 import { debug } from 'node:util'
 import { NoUpstreamError } from './error/upstream.js'
 import { pickId, pickIdOrNil } from './model.js'
-import { LocalRateLimiter, RateLimiter } from './upstream-rate-limiter.js'
+import type { RateLimiter } from './upstream-rate-limiter.js'
+import { LocalRateLimiter } from './upstream-rate-limiter.js'
 import { isNullish } from './type.js'
-import { Upstream, UpstreamOrId } from './upstream.js'
-import { Duration, toMs } from './util.js'
+import type { UpstreamOrId } from './upstream.js'
+import { Upstream } from './upstream.js'
+import type { Duration } from './util.js'
+import { toMs } from './util.js'
 
 const DEBUG = debug('potentia:model:upstream')
 const DEBUG_VERBOSE = debug('potentia:model:upstream:verbose')

@@ -1,17 +1,19 @@
-import {
+import type {
   Filter,
   InsertionOf,
-  Model,
   ModelOrId,
-  Models,
   Timestamp,
-  TIMESTAMP_SCHEMA,
   UpdateFilter,
+} from '../src/model.js'
+import {
+  Model,
+  Models,
+  TIMESTAMP_SCHEMA,
   pickIdOrNil,
   toUnsetOrNil,
   toRangeOrNil,
 } from '../src/model.js'
-import { Uuid } from '../src/type.js'
+import type { Uuid } from '../src/type.js'
 import { option } from '../src/util.js'
 
 export const BAR_NAME = 'bars'

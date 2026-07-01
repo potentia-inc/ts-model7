@@ -4,12 +4,8 @@ import { after, before, describe, test } from 'node:test'
 import { NoUpstreamError } from '../src/error/upstream.js'
 import { Connection } from '../src/mongo.js'
 import { Nil, Uuid, isNullish } from '../src/type.js'
-import {
-  UPSTREAM_SCHEMA,
-  UpstreamInsert,
-  UpstreamQuery,
-  Upstreams,
-} from '../src/upstream.js'
+import type { UpstreamInsert, UpstreamQuery } from '../src/upstream.js'
+import { UPSTREAM_SCHEMA, Upstreams } from '../src/upstream.js'
 import { UpstreamPool } from '../src/upstream-pool.js'
 import { sleep } from '../src/util.js'
 import { empty, match, string, uuid } from './assert.js'

@@ -1,21 +1,25 @@
 import assert from 'node:assert'
 import { getMessage } from './error.js'
 import { LockError, RelockError, UnlockError } from './error/lock.js'
-import {
+import type {
   Filter,
   InsertionOf,
-  Model,
   ModelOrId,
-  Models,
   Options,
-  pickIdOrNil,
   StringDoc,
-  STRING_DOC_SCHEMA,
   UpdateFilter,
+} from './model.js'
+import {
+  Model,
+  Models,
+  pickIdOrNil,
+  STRING_DOC_SCHEMA,
   isDuplicationError,
 } from './model.js'
-import { Nil, TypeOrNil, isNullish } from './type.js'
-import { Duration, option, sleep, suppress, toMs } from './util.js'
+import type { TypeOrNil } from './type.js'
+import { Nil, isNullish } from './type.js'
+import type { Duration } from './util.js'
+import { option, sleep, suppress, toMs } from './util.js'
 
 export const LOCK_NAME = 'locks'
 export type LockOrId = ModelOrId<Lock>
