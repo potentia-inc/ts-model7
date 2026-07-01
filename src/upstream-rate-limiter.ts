@@ -1,5 +1,6 @@
 import assert from 'node:assert'
-import { Duration, msleep, toMs } from './util.js'
+import type { Duration } from './util.js'
+import { msleep, toMs } from './util.js'
 
 export interface RateLimiter {
   // Block until a request for `key` may proceed, enforcing at least `interval`

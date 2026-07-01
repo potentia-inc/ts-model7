@@ -1,12 +1,14 @@
-import {
+import type {
   Filter,
   InsertionOf,
-  Model,
   ModelOrId,
-  Models,
-  UUID_DOC_SCHEMA,
   UpdateFilter,
   UuidDoc,
+} from '../src/model.js'
+import {
+  Model,
+  Models,
+  UUID_DOC_SCHEMA,
   pickIdOrNil,
   toUnsetOrNil,
   toRangeOrNil,

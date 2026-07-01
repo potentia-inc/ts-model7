@@ -1,18 +1,22 @@
 import assert from 'node:assert'
-import {
+import type {
   Filter,
   InsertionOf,
-  Model,
   ModelOrId,
-  Models,
-  UUID_DOC_SCHEMA,
   UpdateFilter,
   UuidDoc,
+} from './model.js'
+import {
+  Model,
+  Models,
+  UUID_DOC_SCHEMA,
   pickIdOrNil,
   toUnsetOrNil,
 } from './model.js'
-import { Nil, TypeOrNil, Uuid, isNullish } from './type.js'
-import { Duration, option, toMs } from './util.js'
+import type { TypeOrNil } from './type.js'
+import { Nil, Uuid, isNullish } from './type.js'
+import type { Duration } from './util.js'
+import { option, toMs } from './util.js'
 
 export const UPSTREAM_NAME = 'upstreams'
 
