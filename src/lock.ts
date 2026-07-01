@@ -170,7 +170,8 @@ export class Locks extends Models<
     if (isNullish(state.lock)) throw new LockError()
 
     const done = new AbortController()
-    const nap = (ms: number) => sleep(ms, { signal: done.signal }).catch(suppress(Error))
+    const nap = (ms: number) =>
+      sleep(ms, { signal: done.signal }).catch(suppress(Error))
     const heartbeat = (async () => {
       await nap(timeout)
       while (state.heartbeating && !isNullish(state.lock)) {
