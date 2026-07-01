@@ -3,7 +3,7 @@ import { getMessage } from './error.js';
 import { LockError, RelockError, UnlockError } from './error/lock.js';
 import { Model, Models, pickIdOrNil, STRING_DOC_SCHEMA, isDuplicationError, } from './model.js';
 import { Nil, isNullish } from './type.js';
-import { msleep, option, toMs } from './util.js';
+import { option, sleep, suppress, toMs } from './util.js';
 export const LOCK_NAME = 'locks';
 export class Lock extends Model {
     expiresAt;
@@ -80,7 +80,8 @@ export class Locks extends Models {
         return this.$model(relocked);
     }
     async lock(key, exec, options = {}) {
-        const ttl = toMs(options.ttl ?? '3s'); // ms
+        // note: inside this function all duration is ms
+        const ttl = toMs(options.ttl ?? '3s');
         const retries = options.retries ?? 0; // no retry by default
         assert(ttl >= 1);
         assert(Number.isInteger(retries) && retries >= 0);
@@ -93,9 +94,10 @@ export class Locks extends Models {
         };
         if (isNullish(state.lock))
             throw new LockError();
-        const abortController = new AbortController();
+        const done = new AbortController();
+        const nap = (ms) => sleep(ms, { signal: done.signal }).catch(suppress(Error));
         const heartbeat = (async () => {
-            await msleep(timeout);
+            await nap(timeout);
             while (state.heartbeating && !isNullish(state.lock)) {
                 try {
                     state.lock = await this.relock(state.lock, { expiresAt: until() });
@@ -105,18 +107,19 @@ export class Locks extends Models {
                     if (state.retries === retries) {
                         state.lock = Nil;
                         options.onError?.(new RelockError(getMessage(err)));
-                        abortController.abort();
+                        done.abort();
                         break;
                     }
                     ++state.retries;
                 }
-                await msleep(state.retries > 0 ? Math.min(10, timeout) : timeout);
+                await nap(state.retries > 0 ? Math.min(10, timeout) : timeout);
             }
         })();
         try {
-            return await exec(abortController.signal);
+            return await exec(done.signal);
         }
         finally {
+            done.abort();
             state.heartbeating = false;
             await heartbeat;
             if (!isNullish(state.lock)) {

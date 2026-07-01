@@ -1,6 +1,6 @@
 {
   "name": "@potentia/model7",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "cross-runtime model utilities for mongodb^7.0.0 on node.js, bun and deno",
   "type": "module",
   "main": "./model.js",
@@ -27,6 +27,7 @@
     "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
+    "bson": "~7.2.0",
     "eslint": "^10.0.0",
     "eslint-config-prettier": "^10.0.0",
     "globals": "^17.0.0",
@@ -89,6 +90,6 @@
     }
   },
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=24.0.0"
   }
 }

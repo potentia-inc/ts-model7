@@ -1,8 +1,24 @@
 # Change log
 
+## [2.1.1] - 2026-07-01
+
+### Fixed
+
+- `Locks.lock()` releases the lock and returns as soon as the `exec` callback
+  settles. Previously its heartbeat left the `finally` blocked in a sleep for up
+  to `ttl / 2` after `exec` finished, delaying both the unlock and the result.
+
+### Changed
+
+- Require Node.js >= 24 (was >= 22), matching the build/test toolchain.
+- Document that `bson` >= 7.3.0 crashes on import under Bun (a Bun limitation);
+  Bun users should pin `bson` below 7.3.0 in their own `package.json`. Node.js
+  and Deno are unaffected.
+
 ## [2.1.0] - 2026-06-17
 
 Upgrade @potentia/util to 4.3.0
+
 - toBigInt/toNumber accept numeric wrapper objects and integral decimal
   strings; empty-string/array inputs now throw.
 
