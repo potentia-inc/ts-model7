@@ -1,5 +1,29 @@
 # Change log
 
+## [2.2.0] - 2026-07-13
+
+`@potentia/util` and `@potentia/mongodb7` are no longer bundled with model7 —
+**you must now install them yourself**, alongside the `mongodb` driver. This is
+not an API change: your model7 code compiles and runs unchanged once the packages
+are present. But upgrading from 2.1.x will fail to resolve them until you add
+them to your own `package.json`.
+
+### Changed
+
+- `@potentia/util` and `@potentia/mongodb7` moved from **dependencies** to
+  packages you provide, joining `mongodb`. They were bundled as pinned GitHub
+  tags; providing them yourself keeps a **single shared instance** across your
+  app, so the re-exported errors, `Uuid` and `ObjectId` compare and `catch`
+  correctly and the BSON types keep one identity — a nested second copy would
+  break all of that.
+
+  Add to your `package.json`, pinned to exact GitHub tags (Bun and Deno cannot
+  resolve a semver range against a GitHub dependency):
+
+  - `@potentia/util` >= 4.2.0 — e.g. `github:potentia-inc/ts-util#4.3.1`
+  - `@potentia/mongodb7` >= 2.0.0 — e.g. `github:potentia-inc/ts-mongodb7#2.0.1`
+  - `mongodb` ^7.0.0 (unchanged — already a peer dependency)
+
 ## [2.1.2] - 2026-07-01
 
 Track the latest releases of both dependencies; no API or runtime changes.
