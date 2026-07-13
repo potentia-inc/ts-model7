@@ -23,17 +23,34 @@ types), `@potentia/model7/type` (`Uuid`, `ObjectId`, `Nil`, coercions),
 
 ## Runtime support
 
-Works on **Node.js (>= 22)**, **Bun** and **Deno (>= 2)**. The published package
-ships compiled JavaScript plus type declarations. `@potentia/util` and
-`@potentia/mongodb7` are bundled as **dependencies**; the `mongodb` driver is a
-**peer dependency** you provide, so its BSON types (`UUID`, `ObjectId`) keep a
-single identity across your app. A framework-free `smoke.mjs` exercises a
-live-MongoDB round trip on Node, Bun and Deno; the `node:test` suites run on Node
-and Deno (Bun cannot run `node:test` yet —
+Works on **Node.js (>= 24)**, **Bun** and **Deno (>= 2)**. The published package
+ships compiled JavaScript plus type declarations. A framework-free `smoke.mjs`
+exercises a live-MongoDB round trip on Node, Bun and Deno; the `node:test` suites
+run on Node and Deno (Bun cannot run `node:test` yet —
 [oven-sh/bun#5090](https://github.com/oven-sh/bun/issues/5090)).
 
+### Required packages
+
+model7 does **not** bundle its building blocks — you install them yourself so
+they resolve to a **single shared instance** across your app. This matters:
+model7 re-exports `@potentia/util` / `@potentia/mongodb7` errors, `Uuid` and
+`ObjectId`, and a second, nested copy would break `instanceof` / `catch` and give
+the BSON types two identities. Add all of these to your own `package.json`:
+
+- **`@potentia/util`** — `>= 4.2.0`, e.g. `github:potentia-inc/ts-util#4.3.1`
+- **`@potentia/mongodb7`** — `>= 2.0.0`, e.g. `github:potentia-inc/ts-mongodb7#2.0.1`
+- **`mongodb`** — `^7.0.0` (the driver; a declared peer dependency)
+
+They are consumed as GitHub tags (Bun and Deno cannot resolve a semver range
+against a GitHub dependency, so pin an exact tag rather than a `^` range):
+
 ```sh
-npm install @potentia/model7 mongodb   # or: bun add / deno add
+npm install \
+  github:potentia-inc/ts-model7#<tag> \
+  github:potentia-inc/ts-util#4.3.1 \
+  github:potentia-inc/ts-mongodb7#2.0.1 \
+  mongodb
+# or the bun add / deno add equivalents
 ```
 
 ### Bun and bson
